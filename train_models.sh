@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# see end of file for attribution
-
-# DESCRIPTION OF FILE HERE
-
 #Set Script Name variable
 SCRIPT=`basename ${BASH_SOURCE[0]}`
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"
@@ -228,6 +224,20 @@ check_dir_final_char () {
 	return 0
 }
 
+check_relative_path () {
+	if ! [[ "$DIR" = /* ]]; then
+		echo "Error: relative paths are not allowed for any location, ${BOLD}$1${NORM} is a relative path"
+		exit 1 
+	fi
+}
+
+check_relative_path $SOURCE_TRAIN_FILE
+check_relative_path $TARGET_TRAIN_FILE
+check_relative_path $SOURCE_DEV_FILE
+check_relative_path $TARGET_DEV_FILE
+check_relative_path "$TRAIN_MODEL_PATH"
+
+
 check_dir_final_char "$TRAIN_MODEL_PATH"
 BOOL_COND=$?
 if [[ "$BOOL_COND" == 1 ]]; then
@@ -245,10 +255,18 @@ check_bool "$TRAIN_PARENT_MODEL"
 
 if [[ -n "$PARENT_MODEL_PATH" ]]
 then
+	check_relative_path "$PARENT_MODEL_PATH"
+	check_dir_final_char "$PARENT_MODEL_PATH"
+	BOOL_COND=$?
+	if [[ "$BOOL_COND" == 1 ]]; then
+		PARENT_MODEL_PATH=$PARENT_MODEL_PATH"/"
+	fi
 	check_parent_structure "$PARENT_MODEL_PATH"		
 fi
 
 if [[ "$TRAIN_PARENT_MODEL" == "1" ]]; then
+	check_relative_path $MAPPING_SOURCE
+	check_relative_path $MAPPING_TARGET
 	check_zero_file $MAPPING_SOURCE
 	check_zero_file $MAPPING_TARGET
 fi

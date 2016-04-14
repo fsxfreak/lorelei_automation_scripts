@@ -110,7 +110,7 @@ check_equal_lines () {
 	fi	
 }
 
-check_zero_file () {
+check_zero_dir () {
 	if [[ ! -d "$1" ]]
 	then
 		echo "Error directory: ${BOLD}$1${NORM} does not exist"
@@ -140,9 +140,70 @@ check_dir_final_char () {
 	return 0
 }
 
+check_relative_path () {
+	if ! [[ "$DIR" = /* ]]; then
+		echo "Error: relative paths are not allowed for any location, ${BOLD}$1${NORM} is a relative path"
+		exit 1 
+	fi
+}
 
+check_zero_file () {
+	if [[ ! -s "$1" ]]
+	then
+		echo "Error file: ${BOLD}$1${NORM} is of zero size or does not exist"
+		exit 1
+	fi
+}
+
+#checks to see if the parent directory exists, has directories model{1-8} and in each of those directories has a best.nn file
+check_parent_structure () {
+	
+	if [[ -z "$1" ]]
+	then
+		echo "Error the flag ${BOLD}parent_model${NORM} must be specified" 
+		exit 1
+	fi
+	
+	if [[ ! -d "$1" ]]
+	then
+		echo "Error parent model directory: ${BOLD}$1${NORM} does not exist"
+		exit 1
+	fi	
+	
+	for i in $( seq 1 8 )
+	do
+		if [[ ! -d "$1""model""$i" ]]
+		then
+			echo "Error directory ${BOLD}model$i${NORM} in parent model directory ${BOLD}$1${NORM} does not exist"
+			exit 1
+		fi
+		
+		if [[ ! -s $1"model"$i"/best.nn" ]]
+		then
+			echo "Error model file ${BOLD}$1"model"$i"/best.nn"${NORM} does not exist"
+			exit 1
+		fi
+	done
+}
+
+check_valid_file_path () {
+	VAR=$1
+	DIR=${VAR%/*}	
+	if [[ ! -d $DIR ]]; then
+		echo "Error path for file ${BOLD}$1${NORM} does not exist"
+		exit 1
+	fi
+}
+
+check_relative_path "$SOURCE_RESCORE_FILE"
+check_relative_path "$TARGET_RESCORE_FILE"
+check_relative_path "$MODEL_FILE"
+check_relative_path "$SCORE_FILE"
+check_zero_file "$SOURCE_RESCORE_FILE"
+check_zero_file "$TARGET_RESCORE_FILE"
+check_parent_structure "$MODEL_FILE"
 check_equal_lines "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE"
-check_zero_file "$MODEL_FILE"
+check_zero_dir "$MODEL_FILE"
 SCORE_DIR=$(dirname "${SCORE_FILE}")
 check_exists "$SCORE_DIR"
 find_longest_sent "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE"
@@ -152,7 +213,7 @@ BOOL_COND=$?
 if [[ "$BOOL_COND" == 1 ]]; then
 	MODEL_FILE=$MODEL_FILE"/"
 fi
-MODEL_FILE=$MODEL_FILE"/model1/best.nn"
+MODEL_FILE=$MODEL_FILE"model1/best.nn"
 
 
 #### Path to Executable ####
