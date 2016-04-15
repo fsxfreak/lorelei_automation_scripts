@@ -119,13 +119,31 @@ check_parent_structure () {
 	done
 }
 
+check_relative_path () {
+	if ! [[ "$1" = /* ]];then
+		echo "Error: relative paths are not allowed for any location, ${BOLD}$1${NORM} is a relative path"
+		exit 1 
+	fi
+}
+
 check_zero_dir "$OUTPUT_DIR"
 check_dir_final_char "$MODEL_DIR"
+BOOL_COND=$?
+if [[ "$BOOL_COND" == 1 ]]; then
+	MODEL_DIR=$MODEL_DIR"/"
+fi
 check_dir_final_char "$OUTPUT_DIR"
+BOOL_COND=$?
+if [[ "$BOOL_COND" == 1 ]]; then
+	OUTPUT_DIR=$OUTPUT_DIR"/"
+fi
 check_parent_structure "$MODEL_DIR"
+check_relative_path "$OUTPUT_DIR"
+check_relative_path "$MODEL_DIR"
+
 touch $OUTPUT_DIR"info.txt"
 for i in $( seq 1 8 ); do
-	python $DIR"helper_programs/make_graph.py" $MODEL_DIR"model${i}/HPC_OUTPUT.txt" $i $OUTPUT_DIR $OUTPUT_DIR"info.txt"
+	python $DIR"helper_programs/make_graph.py" $MODEL_DIR"model${i}/HPC_OUTPUT.txt" $OUTPUT_DIR $i  $OUTPUT_DIR"info.txt"
 	 
 done
 

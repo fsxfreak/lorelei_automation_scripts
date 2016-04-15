@@ -141,7 +141,7 @@ check_dir_final_char () {
 }
 
 check_relative_path () {
-	if ! [[ "$DIR" = /* ]]; then
+	if ! [[ $1 = /* ]]; then
 		echo "Error: relative paths are not allowed for any location, ${BOLD}$1${NORM} is a relative path"
 		exit 1 
 	fi

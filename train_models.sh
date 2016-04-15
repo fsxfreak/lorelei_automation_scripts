@@ -281,6 +281,23 @@ TRAIN_SINGLE_NORMAL="${DIR}/helper_programs/train_single_model.sh"
 TRAIN_SINGLE_PREINIT="${DIR}/helper_programs/train_preinit_model.sh"
 CREATE_MAPPING_PURE="${DIR}/helper_programs/create_mapping_pureNMT.py"
 CREATE_MAPPING_PARENT="${DIR}/helper_programs/create_mapping_parent.py"
+BERK_ALIGN="${DIR}/helper_programs/berk_align.sh"
+
+#create the berkeley aligner
+if [[ "$TRAIN_PARENT_MODEL" == "0" ]]; then
+	mkdir $TRAIN_MODEL_PATH"berk_aligner"
+	mkdir $TRAIN_MODEL_PATH"berk_aligner/data"
+	mkdir $TRAIN_MODEL_PATH"berk_aligner/data/train"
+	mkdir $TRAIN_MODEL_PATH"berk_aligner/data/test"
+	cp $SOURCE_TRAIN_FILE $TRAIN_MODEL_PATH"berk_aligner/data/train/train.f"
+	cp $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"berk_aligner/data/train/train.e"
+	cp $SOURCE_DEV_FILE $TRAIN_MODEL_PATH"berk_aligner/data/test/test.f"
+	cp $TARGET_DEV_FILE $TRAIN_MODEL_PATH"berk_aligner/data/test/test.e"
+	cp ${DIR}"/helper_programs/align" $TRAIN_MODEL_PATH"berk_aligner"
+	cp ${DIR}"/helper_programs/berkeleyaligner.jar" $TRAIN_MODEL_PATH"berk_aligner"
+	cp ${DIR}"/helper_programs/unk_replace.conf" $TRAIN_MODEL_PATH"berk_aligner"
+	$SMART_QSUB $BERK_ALIGN $TRAIN_MODEL_PATH"berk_aligner"
+fi
 
 ### Check if doing preinitialization and if so launch the models  ###
 if [[ -n "$PARENT_MODEL_PATH" ]]
@@ -291,11 +308,11 @@ then
 	done
 	exit 0
 elif [[ "$TRAIN_PARENT_MODEL" == "0" ]]; then
-
-	python $CREATE_MAPPING_PURE $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE "6" "$TRAIN_MODEL_PATH""count6.nn" 
+	python $CREATE_MAPPING_PURE $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE "6" "$TRAIN_MODEL_PATH""count6.nn"
 else
 	python $CREATE_MAPPING_PARENT $MAPPING_SOURCE $MAPPING_TARGET "6" "$TRAIN_MODEL_PATH""count6.nn" $SOURCE_TRAIN_FILE
 fi
+
 
 
 ### Model settings ###

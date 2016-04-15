@@ -154,6 +154,14 @@ check_valid_file_path () {
 	fi
 }
 
+check_relative_path () {
+	if ! [[ "$1" = /* ]]; then
+		echo "Error: relative paths are not allowed for any location, ${BOLD}$1${NORM} is a relative path"
+		exit 1 
+	fi
+}
+
+
 check_zero_file "$INPUT_FILE"
 check_valid_num "$KBEST_SIZE"
 BEAM_SIZE=$(( 12 > $KBEST_SIZE ? 12 : $KBEST_SIZE ))
@@ -165,9 +173,13 @@ fi
 check_parent_structure "$TRAINED_MODELS_PATH"
 LONGEST_SENT=$( wc -L $INPUT_FILE | cut -f1 -d' ' )
 check_valid_file_path "$OUTPUT_FILE"
+check_relative_path "$INPUT_FILE"
+check_relative_path "$TRAINED_MODELS_PATH"
+check_relative_path "$OUTPUT_FILE"
 
 #paths
-RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
+#RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
+RNN_LOCATION="/home/nlg-05/zoph/MT_Experiments/new_experiments_3/char_mt/new_exec/RNN_MODEL"
 MODEL_NAMES=""
 for i in $( seq 1 8 ); do
 	CURR_MODEL_NAME="${TRAINED_MODELS_PATH}model${i}/best.nn"
@@ -187,7 +199,4 @@ DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
 $SMART_QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE
 
 exit 0
-
-
-
 
