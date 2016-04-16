@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+#This script was written by barret zoph for questions email barretzoph@gmail.com
+
 #Set Script Name variable
 SCRIPT=`basename ${BASH_SOURCE[0]}`
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"

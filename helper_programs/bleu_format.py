@@ -3,15 +3,18 @@ import sys
 import re
 
 input_file_name = str(sys.argv[1])
-output_file_name = input_file_name + '.bleu'
 input_file = codecs.open(input_file_name,'r','utf-8')
-output_file = codecs.open(output_file_name,'w','utf-8')
 
+outputs= []
 for line in input_file:
 	re.sub('\n','',line)
 	line = line.split(' ')
 	if line[0]=="<START>":
 		del line[0]
 		del line[-1]
-		output_file.write(' '.join(line)+'\n')
+		outputs.append(' '.join(line)+'\n')
+
+input_file = codecs.open(input_file_name,'w','utf-8')	
+for line in outputs:
+	input_file.write(line)
 

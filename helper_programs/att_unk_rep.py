@@ -12,7 +12,7 @@ tgt_unk_locations = codecs.open(sys.argv[4],'r','utf-8') #output from the unk re
 dict_file = codecs.open(dict_name,'r','utf-8')
 src_data = [line.replace('\n','') for line in codecs.open(src_file_name,'r','utf-8')]
 tgt_data = [line.replace('\n','') for line in codecs.open(tgt_file_name,'r','utf-8')]
-tgt_output_file = codecs.open(tgt_file_name+'.output','w','utf-8')
+tgt_output_file = codecs.open(tgt_file_name,'w','utf-8')
 
 unk_locations = [[] for i in range(0,len(src_data))]
 index = 0

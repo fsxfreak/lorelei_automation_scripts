@@ -1,10 +1,7 @@
 #!/bin/bash
-#PBS -q isi
-#PBS -l walltime=336:00:00
-#PBS -l gpus=2
 
 #This script was written by barret zoph for questions email barretzoph@gmail.com
-#It will return 1 if not successful, 0 if successful
+
 
 #### Things that must be specified by user ####
 SOURCE_RESCORE_FILE="" #Hard path and name of the source file being rescored (e.g. "/home/nlg/source_data.txt")
@@ -129,7 +126,7 @@ find_longest_sent () {
 	LONGEST_1=$( wc -L $1 | cut -f1 -d' ' )
 	LONGEST_2=$( wc -L $2 | cut -f1 -d' ' )
 	MAX_VAL=$(( $LONGEST_1 > $LONGEST_2 ? $LONGEST_1 : $LONGEST_2 ))
-	return $MAX_VAL
+	echo $MAX_VAL
 }
 
 check_dir_final_char () {
@@ -195,6 +192,11 @@ check_valid_file_path () {
 	fi
 }
 
+check_dir_final_char "$MODEL_FILE"  
+BOOL_COND=$?
+if [[ "$BOOL_COND" == 1 ]]; then
+	MODEL_FILE=$MODEL_FILE"/"
+fi
 check_relative_path "$SOURCE_RESCORE_FILE"
 check_relative_path "$TARGET_RESCORE_FILE"
 check_relative_path "$MODEL_FILE"
@@ -206,13 +208,8 @@ check_equal_lines "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE"
 check_zero_dir "$MODEL_FILE"
 SCORE_DIR=$(dirname "${SCORE_FILE}")
 check_exists "$SCORE_DIR"
-find_longest_sent "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE"
-LONGEST_SENT=$?
-check_dir_final_char "$MODEL_FILE"  
-BOOL_COND=$?
-if [[ "$BOOL_COND" == 1 ]]; then
-	MODEL_FILE=$MODEL_FILE"/"
-fi
+LONGEST_SENT=$( find_longest_sent "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE" )
+
 MODEL_FILE=$MODEL_FILE"model1/best.nn"
 
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+#This script was written by barret zoph for questions email barretzoph@gmail.com
+
 #Set Script Name variable
 SCRIPT=`basename ${BASH_SOURCE[0]}`
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"
@@ -161,6 +163,22 @@ check_relative_path () {
 	fi
 }
 
+check_berk_aligner () {
+	if [[ ! -d $1"berk_aligner" ]]; then
+		echo "Error: the berkeley aligner info is not in the directory ${BOLD}$1${NORM}"
+		exit 1
+	fi
+	if [[ ! -s $1"berk_aligner/aligner_output/stage2.1.params.txt" ]]; then
+		echo "Error: the ttable from the berkeley aligner at location ${BOLD}$1${NORM} is not there. It could be that the aligner needs more time to run"
+		exit 1
+	fi	
+}
+
+if [[ $KBEST_SIZE != 1 ]]; then
+	echo "Error num_best must be equal to one in this version. An updated version is coming soon"
+	exit 1  
+fi
+
 
 check_zero_file "$INPUT_FILE"
 check_valid_num "$KBEST_SIZE"
@@ -176,10 +194,15 @@ check_valid_file_path "$OUTPUT_FILE"
 check_relative_path "$INPUT_FILE"
 check_relative_path "$TRAINED_MODELS_PATH"
 check_relative_path "$OUTPUT_FILE"
+check_berk_aligner "$TRAINED_MODELS_PATH"
 
 #paths
-#RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
-RNN_LOCATION="/home/nlg-05/zoph/MT_Experiments/new_experiments_3/char_mt/new_exec/RNN_MODEL"
+RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
+#RNN_LOCATION="/home/nlg-05/zoph/MT_Experiments/new_experiments_3/char_mt/new_exec/RNN_MODEL"
+BLEU_FORMAT="${DIR}helper_programs/bleu_format.py"
+UNK_REP="${DIR}helper_programs/att_unk_rep.py"
+DECODE_FORMAT="${DIR}helper_programs/decode_format.py"
+TTABLE="${TRAINED_MODELS_PATH}berk_aligner/aligner_output/stage2.1.params.txt"
 MODEL_NAMES=""
 for i in $( seq 1 8 ); do
 	CURR_MODEL_NAME="${TRAINED_MODELS_PATH}model${i}/best.nn"
@@ -196,7 +219,7 @@ FINAL_ARGS="\" $RNN_LOCATION -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_S
 SMART_QSUB="${DIR}helper_programs/qsubrun"
 DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
 
-$SMART_QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE
+$SMART_QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE $BLEU_FORMAT $OUTPUT_FILE $TTABLE $UNK_REP $DECODE_FORMAT 
 
 exit 0
 
