@@ -32,8 +32,8 @@ for tup in target_counts:
 	if target_counts[tup] >= count_threshold:
 		target_words.add(tup)
 
-print "Number of unique source words above count threshold:",len(source_words)
-print "Number of unique target words above count threshold:",len(target_words)
+print >> sys.stderr, "Number of unique source words above count threshold:",len(source_words)
+print >> sys.stderr, "Number of unique target words above count threshold:",len(target_words)
 
 index = 1
 output_model_file.write('1 1 '+ str(len(target_words)+3) + ' ' + str(len(source_words)+1) +'\n')

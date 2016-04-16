@@ -44,10 +44,10 @@ function HELP {
 #Check the number of arguments. If none are passed, print help and exit.
 NUMARGS=$#
 
-echo "Number of arguements specified: ${NUMARGS}"
+>&2 echo "Number of arguements specified: ${NUMARGS}"
 
 if [[ $NUMARGS < 10 ]]; then
-    echo -e \\n"Number of arguments: $NUMARGS"
+    >&2 echo -e \\n"Number of arguments: $NUMARGS"
     HELP
 fi
 
@@ -68,43 +68,43 @@ while getopts $optspec FLAG; do
     -) #long flag options
 	case "${OPTARG}" in
 		train_source)
-			echo "train_source : ""${!OPTIND}"	
+			>&2 echo "train_source : ""${!OPTIND}"	
 			SOURCE_TRAIN_FILE="${!OPTIND}"
 			;;
 		train_target)
-			echo "train_target : ""${!OPTIND}"
+			>&2 echo "train_target : ""${!OPTIND}"
 			TARGET_TRAIN_FILE="${!OPTIND}"
 			;;
 		dev_source)
-			echo "dev_source : ""${!OPTIND}"
+			>&2 echo "dev_source : ""${!OPTIND}"
 			SOURCE_DEV_FILE="${!OPTIND}"		
 			;;
 		dev_target)
-			echo "dev_target : ""${!OPTIND}"
+			>&2 echo "dev_target : ""${!OPTIND}"
 			TARGET_DEV_FILE="${!OPTIND}"
 			;;
 		trained_model)
-			echo "trained_model : ""${!OPTIND}"
+			>&2 echo "trained_model : ""${!OPTIND}"
 			TRAIN_MODEL_PATH="${!OPTIND}"	
 			;;
 		train_parent_model)
-			echo "train_parent_model : ""${!OPTIND}"
+			>&2 echo "train_parent_model : ""${!OPTIND}"
 			TRAIN_PARENT_MODEL="${!OPTIND}"
 			;;
 		mapping_source_data)
-			echo "mapping_source_data : ""${!OPTIND}"
+			>&2 echo "mapping_source_data : ""${!OPTIND}"
 			MAPPING_SOURCE="${!OPTIND}"
 			;;
 		mapping_target_data)
-			echo "mapping_target_data : ""${!OPTIND}"
+			>&2 echo "mapping_target_data : ""${!OPTIND}"
 			MAPPING_TARGET="${!OPTIND}"
 			;;
 		parent_model)
-			echo "parent_model : ""${!OPTIND}"
+			>&2 echo "parent_model : ""${!OPTIND}"
 			PARENT_MODEL_PATH="${!OPTIND}"			
 			;;	
 		*) #unrecognized long flag
-			echo -e \\n"Option --${BOLD}$OPTARG${NORM} not allowed."
+			>&2 echo -e \\n"Option --${BOLD}$OPTARG${NORM} not allowed."
 			HELP	
 			;;
 	esac;;
@@ -112,7 +112,7 @@ while getopts $optspec FLAG; do
       HELP
       ;;
     \?) #unrecognized option - show help
-      echo -e \\n"Option -${BOLD}$OPTARG${NORM} not allowed."
+      >&2 echo -e \\n"Option -${BOLD}$OPTARG${NORM} not allowed."
       HELP
       #If you just want to display a simple error message instead of the full
       #help, remove the 2 lines above and uncomment the 2 lines below.

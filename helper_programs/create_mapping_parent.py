@@ -40,8 +40,8 @@ for tup in target_counts:
 	if target_counts[tup] >= count_threshold:
 		target_words.add(tup)
 
-print "Number of unique source words above count threshold:",len(source_words)
-print "Number of unique target words above count threshold:",len(target_words)
+print >> sys.stderr, "Number of unique source words above count threshold:",len(source_words)
+print >> sys.stderr, "Number of unique target words above count threshold:",len(target_words)
 
 import operator
 sorted_big_counts = sorted(source_big_counts.items(), key=operator.itemgetter(1))[::-1][:len(source_words)]
