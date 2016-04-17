@@ -215,7 +215,7 @@ for i in $( seq 1 8 ); do
 		sed -i "1s/.*/$TEMP_FIRST/" $CURR_MODEL_NAME 
 	fi
 done
-FINAL_ARGS="\" $RNN_LOCATION -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1  -L $LONGEST_SENT \""
+FINAL_ARGS="\" $RNN_LOCATION -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 -M 0 0 0 0 1 1 1 1 -L $LONGEST_SENT \""
 SMART_QSUB="${DIR}helper_programs/qsubrun"
 DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
 
