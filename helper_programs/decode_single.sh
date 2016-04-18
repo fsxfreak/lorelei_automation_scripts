@@ -23,10 +23,12 @@ OUTPUT_FILE=$4
 TTABLE=$5
 UNK_REP=$6
 DECODE_FORMAT=$7
+MODEL_NUMS=$8
 FINAL_DATA=""
+SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
 echo "FINAL_ARGS = $FINAL_ARGS"
 echo "ORIG_DATA = $ORIG_DATA"
-for i in $( seq 1 8 ); do 
+for i in $SPACED_MODEL_NUMS; do 
 	cp $ORIG_DATA  $MTMP"/src_data${i}.txt"
 	FINAL_DATA=$FINAL_DATA" src_data${i}.txt"
 done
