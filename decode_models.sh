@@ -13,7 +13,7 @@ KBEST_SIZE=""
 OUTPUT_FILE=""
 BEAM_SIZE="" #make sure beam size is >= kbest_size
 LONGEST_SENT=""
-MODEL_NUMS="1_2_3_4_5_6_7_8"
+MODEL_NUMS="1_5_2_6_3_7_4_8" # out of order to avoid putting all the big models on the same gpu
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -174,7 +174,7 @@ check_berk_aligner () {
         echo "Error: the berkeley aligner info is not in the directory ${BOLD}$1${NORM}"
         exit 1
     fi
-    if [[ ! -s $1"berk_aligner/aligner_output/stage2.1.params.txt" ]]; then
+    if [[ ! -s $1"berk_aligner/aligner_output/stage2.2.params.txt" ]]; then
         echo "Error: the ttable from the berkeley aligner at location ${BOLD}$1${NORM} is not there. It could be that the aligner needs more time to run"
         exit 1
     fi      
@@ -208,7 +208,7 @@ RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
 BLEU_FORMAT="${DIR}helper_programs/bleu_format.py"
 UNK_REP="${DIR}helper_programs/att_unk_rep.py"
 DECODE_FORMAT="${DIR}helper_programs/decode_format.py"
-TTABLE="${TRAINED_MODELS_PATH}berk_aligner/aligner_output/stage2.1.params.txt"
+TTABLE="${TRAINED_MODELS_PATH}berk_aligner/aligner_output/stage2.2.params.txt"
 MODEL_NAMES=""
 SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
 MFLAGS="-M";
