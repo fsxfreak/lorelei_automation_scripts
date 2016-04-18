@@ -13,6 +13,7 @@ KBEST_SIZE=""
 OUTPUT_FILE=""
 BEAM_SIZE="" #make sure beam size is >= kbest_size
 LONGEST_SENT=""
+MODEL_NUMS="1_2_3_4_5_6_7_8"
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -26,6 +27,7 @@ function HELP {
   echo "${BOLD}The following switches are:${NORM}"
   echo "${REV}--input_file${NORM}  : Specify the location of the data you want to decode."
   echo "${REV}--trained_models${NORM}  : Specify the location of the model you want to decode."
+  echo "${REV}--model_nums${NORM}  : Specify the subset of models (1-8, joined with underscore) you want to use (default is all 8)."
   echo "${REV}--num_best${NORM}  : Per sentence in the input_file, this is the number of decodings the model will output." 
   echo "${REV}--output_file${NORM}  : Specify the location of the output file the model generates." 
   echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
