@@ -57,17 +57,21 @@ def main():
   outfile = prepfile(args.outfile, 'w')
 
   tuplen = -1
+  featurenames = []
   for ln, tup in enumerate(izip(*infiles), start=1):
     vals = []
     for line in tup:
       for val in line.strip().split():
-        vals.append("%s_%d=%f" % (args.prefix, len(vals), -(float(val))))
+        featname = "%s_%d" % (args.prefix, len(vals)) 
+        if tuplen == -1:
+          featurenames.append(featname)
+        vals.append("%s=%f" % (featname, -(float(val))))
     if tuplen == -1:
       tuplen = len(vals)
     elif len(vals) != tuplen:
       sys.stderr.write("Expected all lines to have %d items but got %d at line %d\n" % (tuplen, len(vals), ln))
       sys.exit(1)
     outfile.write(' '.join(vals)+"\n")
-
+  sys.stdout.write(' '.join(featurenames)+"\n")
 if __name__ == '__main__':
   main()
