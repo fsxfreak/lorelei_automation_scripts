@@ -8,6 +8,7 @@ SOURCE_RESCORE_FILE="" #Hard path and name of the source file being rescored (e.
 TARGET_RESCORE_FILE="" #Hard path and name of the target file being rescored (e.g. "/home/nlg/target_data.txt")
 MODEL_FILE="" #Hard path and name of the model file being used for rescoring (e.g. "/home/nlg/model.nn")
 SCORE_FILE="" #Name of file that scores are put (e.g. "score.txt")
+MODEL_NUM="1" # model number to use (1-8)
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"
 
@@ -20,6 +21,7 @@ function HELP {
     echo -e \\n"Help documentation for ${BOLD}${SCRIPT}.${NORM}"\\n
     echo "${BOLD}The following switches are required:${NORM}"
     echo "${REV}--model${NORM}  : Specify the location of the trained NMT models."
+    echo "${REV}--model_num${NORM}  : Specify the number of the trained NMT model to use in rescoring."
     echo "${REV}--source${NORM}  : Specify the location of the source data to be rescored." 
     echo "${REV}--target${NORM}  : Specify the location of the target data to be rescored." 
     echo "${REV}--scores${NORM}  : Specify the location of the generated scores files." 
@@ -31,7 +33,7 @@ function HELP {
 #Check the number of arguements. If none are passed, print help and exit.
 NUMARGS=$#
 
-if [[ $NUMARGS != "8" ]]; then
+if [[ $NUMARGS -lt "8" ]]; then
     echo -e \\n"Number of arguments: $NUMARGS"
     HELP
 fi
@@ -55,6 +57,10 @@ while [[ $VAR -le $NUM ]]; do
                     model)
                         echo "model = ""${!OPTIND}"     
                         MODEL_FILE="${!OPTIND}"
+                        ;;
+                    model_num)
+                        echo "model_num = ""${!OPTIND}"     
+                        MODEL_NUM="${!OPTIND}"
                         ;;
                     source)
                         echo "source = ""${!OPTIND}"
@@ -210,7 +216,7 @@ SCORE_DIR=$(dirname "${SCORE_FILE}")
 check_exists "$SCORE_DIR"
 LONGEST_SENT=$( find_longest_sent "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE" )
 
-MODEL_FILE=$MODEL_FILE"model1/best.nn"
+MODEL_FILE=$MODEL_FILE"model"$MODEL_NUM"/best.nn"
 
 
 #### Path to Executable ####
