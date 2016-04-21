@@ -3,6 +3,8 @@
 #PBS -l walltime=336:00:00
 #PBS -l gpus=2
 
+set -e
+
 tmpdir=${TMPDIR:-/tmp}
 MTMP=$(mktemp -d --tmpdir=$tmpdir XXXXXX)
 function cleanup() {

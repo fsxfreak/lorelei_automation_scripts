@@ -3,6 +3,8 @@
 #PBS -l walltime=336:00:00
 #PBS -l gpus=2
 
+set -e
+
 #This script was written by barret zoph for questions email barretzoph@gmail.com
 #It will return 1 if not successful, 0 if successful
 
@@ -31,5 +33,5 @@ export LD_LIBRARY_PATH
 cd $DIRECTORY
 perl $PRETRAIN_PATH parent.nn $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $SOURCE_DEV_FILE $TARGET_DEV_FILE best.nn
 
-return 0
+exit 0
  
