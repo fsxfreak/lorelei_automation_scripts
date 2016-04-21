@@ -14,11 +14,13 @@ SOURCE_DEV_FILE="" #Source dev file (e.g. "/home/nlg/source_dev_data.txt")
 TARGET_DEV_FILE="" #Target dev file (e.g. "/home/nlg/target_dev_data.txt")
 TRAIN_MODEL_PATH="" #Where the new models will be output to
 TRAIN_PARENT_MODEL="0" #1 or 0
+RUN_BERKELEY_ALIGNER="1" # 1 or 0; overridden to 0 by TRAIN_PARENT_MODEL
 MAPPING_SOURCE="" #If training a parent model, then supply child source and target training files too
 MAPPING_TARGET="" #If training a parent model, then supply child source and target training files too
 PARENT_MODEL_PATH="" #Where the parent models have trained
 MODEL_NUMS="1_2_3_4_5_6_7_8" # which models to train
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
+EPOCHS="100" # how many epochs to train the models
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -34,8 +36,10 @@ function HELP {
     echo "${REV}--dev_source${NORM}  : Specify the location of the source dev data." 
     echo "${REV}--dev_target${NORM}  : Specify the location of the target dev data." 
     echo "${REV}--trained_model${NORM}  : Specify the path to where the models will be trained."
+    echo "${REV}--epochs${NORM}  : Specify the number of epochs to train for."
     echo "${REV}--model_nums${NORM}  : Specify the subset of models (1-8, joined with underscore) you want to use (default is all 8)."
     echo "${REV}--train_parent_model${NORM}  : 1 if training parent models, 0 if training low resource NMT. Default is 0." 
+    echo "${REV}--run_berkeley_aligner${NORM}  : 1 if you want to run the berkeley aligner (if only rescoring, no need to run this). Default is 1. If train_parent_model is set to 1 this is set to 0" 
     echo "${REV}--mapping_source_data${NORM}  : If --train_parent_model is 1, then input the location of the child source training data."
     echo "${REV}--mapping_target_data${NORM}  : If --train_parent_model is 1, then input the location of the child target training data."
     echo "${REV}--parent_model${NORM}  : Specify the location of the parent models for option 0. Only do this if you are training pre-initialized child models." 
@@ -95,9 +99,17 @@ while [[ $VAR -le $NUM ]]; do
 			>&2 echo "model_nums : ""${!OPTIND}"
                         MODEL_NUMS="${!OPTIND}"
                         ;;
+		    epochs)
+			>&2 echo "epochs : ""${!OPTIND}"
+                        EPOCHS="${!OPTIND}"
+                        ;;
                     train_parent_model)
                         >&2 echo "train_parent_model : ""${!OPTIND}"
                         TRAIN_PARENT_MODEL="${!OPTIND}"
+                        ;;
+                    run_berkeley_aligner)
+                        >&2 echo "run_berkeley_aligner : ""${!OPTIND}"
+                        RUN_BERKELEY_ALIGNER="${!OPTIND}"
                         ;;
                     mapping_source_data)
                         >&2 echo "mapping_source_data : ""${!OPTIND}"
@@ -180,7 +192,7 @@ check_location_exists () {
 check_bool () {
     if [[ "$1" -ne "0" ]] && [[ "$1" -ne "1" ]]
     then
-        echo "Error flag train_parent_model with value: ${BOLD}$1${NORM} is not equal to 0 or 1"
+        echo "Error boolean flag with value: ${BOLD}$1${NORM} is not equal to 0 or 1"
         exit 1
     fi
 }
@@ -266,6 +278,7 @@ check_equal_lines "$SOURCE_TRAIN_FILE" "$TARGET_TRAIN_FILE"
 check_equal_lines "$SOURCE_DEV_FILE" "$TARGET_DEV_FILE"
 check_location_exists "$TRAIN_MODEL_PATH"
 check_bool "$TRAIN_PARENT_MODEL" 
+check_bool "$RUN_BERKELEY_ALIGNER"
 
 if [[ -n "$PARENT_MODEL_PATH" ]]
 then
@@ -279,6 +292,7 @@ then
 fi
 
 if [[ "$TRAIN_PARENT_MODEL" == "1" ]]; then
+    RUN_BERKELEY_ALIGNER="0";
     check_relative_path $MAPPING_SOURCE
     check_relative_path $MAPPING_TARGET
     check_zero_file $MAPPING_SOURCE
@@ -298,7 +312,7 @@ CREATE_MAPPING_PARENT="${DIR}/helper_programs/create_mapping_parent.py"
 BERK_ALIGN="${DIR}/helper_programs/berk_align.sh"
 
 #create the berkeley aligner
-if [[ "$TRAIN_PARENT_MODEL" == "0" ]]; then
+if [[ "$RUN_BERKELEY_ALIGNER" == "1" ]]; then
     mkdir $TRAIN_MODEL_PATH"berk_aligner"
     mkdir $TRAIN_MODEL_PATH"berk_aligner/data"
     mkdir $TRAIN_MODEL_PATH"berk_aligner/data/train"
@@ -354,7 +368,7 @@ MODEL_5_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING2\""
 MODEL_6_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING2\""
 MODEL_7_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING2\""
 MODEL_8_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING2\""
-SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed_input 1 --screen-print-rate 30 --HPC-output 1 -B best.nn -n 100 --random-seed 1 -L 100 $EXTRA_RNN_ARGS\""
+SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed_input 1 --screen-print-rate 30 --HPC-output 1 -B best.nn -n $EPOCHS --random-seed 1 -L 100 $EXTRA_RNN_ARGS\""
 GPU_OPTS_1="\"-M 0 1 1\""
 GPU_OPTS_2="\"-M 0 0 1 1\""
 

@@ -3,6 +3,8 @@
 #PBS -l walltime=336:00:00
 #PBS -l gpus=2
 
+set -e
+
 #This script was written by barret zoph for questions email barretzoph@gmail.com
 #It will return 1 if not successful, 0 if successful
 
