@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 #This script was written by barret zoph for questions email barretzoph@gmail.com
 
 #Set Script Name variable
@@ -21,6 +22,7 @@ PARENT_MODEL_PATH="" #Where the parent models have trained
 MODEL_NUMS="1_2_3_4_5_6_7_8" # which models to train
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
 EPOCHS="100" # how many epochs to train the models
+QSUBOPTS="" # extra options to pass to qsubrun
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -44,6 +46,7 @@ function HELP {
     echo "${REV}--mapping_target_data${NORM}  : If --train_parent_model is 1, then input the location of the child target training data."
     echo "${REV}--parent_model${NORM}  : Specify the location of the parent models for option 0. Only do this if you are training pre-initialized child models." 
     echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
+    echo "${REV}--qsubopts${NORM}  : Specify any additional option string to pass to qsubrun."
     echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
     echo "Example: ${BOLD}$SCRIPT path/to/train_nmt_model.sh --train_source <training_source> --train_target <training_target> --dev_source <dev_source> --dev_target <dev_target> [ --parent_model <parent_model> ] --trained_model <trained_model> --train_parent_model <{0,1}> ${NORM}" 
     exit 1
@@ -126,6 +129,10 @@ while [[ $VAR -le $NUM ]]; do
                     extra_rnn_args)
                         >&2 echo "extra_rnn_args : ""${!OPTIND}"
                         EXTRA_RNN_ARGS="${!OPTIND}"                  
+                        ;;      
+                    qsubopts)
+                        >&2 echo "qsubopts : ""${!OPTIND}"
+                        QSUBOPTS="${!OPTIND}"                  
                         ;;      
                     *) #unrecognized long flag
                         >&2 echo -e \\n"Option --${BOLD}$OPTARG${NORM} not allowed."
@@ -304,12 +311,19 @@ create_new_dir "$TRAIN_MODEL_PATH" "$PARENT_MODEL_PATH"
 ### Path to executables ###
 RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
 PRETRAIN_LOCATION="${DIR}/helper_programs/pretrain.pl"
-SMART_QSUB="${DIR}/helper_programs/qsubrun"
+SMARTQSUB="${DIR}/helper_programs/qsubrun"
 TRAIN_SINGLE_NORMAL="${DIR}/helper_programs/train_single_model.sh"
 TRAIN_SINGLE_PREINIT="${DIR}/helper_programs/train_preinit_model.sh"
 CREATE_MAPPING_PURE="${DIR}/helper_programs/create_mapping_pureNMT.py"
 CREATE_MAPPING_PARENT="${DIR}/helper_programs/create_mapping_parent.py"
 BERK_ALIGN="${DIR}/helper_programs/berk_align.sh"
+
+QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;
+
+QSUB="$SMARTQSUB";
+if [ ! -z "$QSUBOPTS" ]; then
+    QSUB="$QSUB $QSUBOPTS --";
+fi
 
 #create the berkeley aligner
 if [[ "$RUN_BERKELEY_ALIGNER" == "1" ]]; then
@@ -324,7 +338,7 @@ if [[ "$RUN_BERKELEY_ALIGNER" == "1" ]]; then
     cp ${DIR}"/helper_programs/align" $TRAIN_MODEL_PATH"berk_aligner"
     cp ${DIR}"/helper_programs/berkeleyaligner.jar" $TRAIN_MODEL_PATH"berk_aligner"
     cp ${DIR}"/helper_programs/unk_replace.conf" $TRAIN_MODEL_PATH"berk_aligner"
-    cmd="$SMART_QSUB $BERK_ALIGN $TRAIN_MODEL_PATH\"berk_aligner\""
+    cmd="$QSUB $BERK_ALIGN $TRAIN_MODEL_PATH\"berk_aligner\""
     >&2 echo $cmd;
     $cmd;
 fi
@@ -335,7 +349,7 @@ if [[ -n "$PARENT_MODEL_PATH" ]]
 then
     for i in $SPACED_MODEL_NUMS;
     do
-        $SMART_QSUB $TRAIN_SINGLE_PREINIT $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"/model$i" $SOURCE_DEV_FILE $TARGET_DEV_FILE $PRETRAIN_LOCATION 
+        $QSUB $TRAIN_SINGLE_PREINIT $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"/model$i" $SOURCE_DEV_FILE $TARGET_DEV_FILE $PRETRAIN_LOCATION 
     done
     exit 0
 elif [[ "$TRAIN_PARENT_MODEL" == "0" ]]; then
@@ -360,6 +374,7 @@ fi
 
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
 
+
 MODEL_1_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING1\""
 MODEL_2_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING1\""
 MODEL_3_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING1\""
@@ -381,7 +396,7 @@ do
     then
         CURR_GPU_OPT=$GPU_OPTS_2
     fi
-    cmd="$SMART_QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
+    cmd="$QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
     >&2 echo $cmd;
     $cmd;
 done
