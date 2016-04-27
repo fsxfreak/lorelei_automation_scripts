@@ -23,6 +23,7 @@ MODEL_NUMS="1_2_3_4_5_6_7_8" # which models to train
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
 EPOCHS="100" # how many epochs to train the models
 QSUBOPTS="" # extra options to pass to qsubrun
+RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -46,6 +47,7 @@ function HELP {
     echo "${REV}--mapping_target_data${NORM}  : If --train_parent_model is 1, then input the location of the child target training data."
     echo "${REV}--parent_model${NORM}  : Specify the location of the parent models for option 0. Only do this if you are training pre-initialized child models." 
     echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
+    echo "${REV}--rnn_location${NORM}  : Location of the RNN binary."
     echo "${REV}--qsubopts${NORM}  : Specify any additional option string to pass to qsubrun."
     echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
     echo "Example: ${BOLD}$SCRIPT path/to/train_nmt_model.sh --train_source <training_source> --train_target <training_target> --dev_source <dev_source> --dev_target <dev_target> [ --parent_model <parent_model> ] --trained_model <trained_model> --train_parent_model <{0,1}> ${NORM}" 
@@ -129,6 +131,10 @@ while [[ $VAR -le $NUM ]]; do
                     extra_rnn_args)
                         >&2 echo "extra_rnn_args : ""${!OPTIND}"
                         EXTRA_RNN_ARGS="${!OPTIND}"                  
+                        ;;      
+                    rnn_location)
+                        >&2 echo "rnn_location : ""${!OPTIND}"
+                        RNN_LOCATION="${!OPTIND}"                  
                         ;;      
                     qsubopts)
                         >&2 echo "qsubopts : ""${!OPTIND}"
@@ -309,11 +315,17 @@ fi
 create_new_dir "$TRAIN_MODEL_PATH" "$PARENT_MODEL_PATH"
 
 ### Path to executables ###
-RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
-PRETRAIN_LOCATION="${DIR}/helper_programs/pretrain.pl"
+
+
+# old style
+#PRETRAIN_LOCATION="${DIR}/helper_programs/pretrain.pl"
+# new style
+PRETRAIN_LOCATION="${DIR}/helper_programs/pretrain.py"
 SMARTQSUB="${DIR}/helper_programs/qsubrun"
 TRAIN_SINGLE_NORMAL="${DIR}/helper_programs/train_single_model.sh"
+# old style: remove me!
 TRAIN_SINGLE_PREINIT="${DIR}/helper_programs/train_preinit_model.sh"
+
 CREATE_MAPPING_PURE="${DIR}/helper_programs/create_mapping_pureNMT.py"
 CREATE_MAPPING_PARENT="${DIR}/helper_programs/create_mapping_parent.py"
 BERK_ALIGN="${DIR}/helper_programs/berk_align.sh"
@@ -324,6 +336,7 @@ QSUB="$SMARTQSUB";
 if [ ! -z "$QSUBOPTS" ]; then
     QSUB="$QSUB $QSUBOPTS --";
 fi
+
 
 #create the berkeley aligner
 if [[ "$RUN_BERKELEY_ALIGNER" == "1" ]]; then
@@ -349,56 +362,63 @@ if [[ -n "$PARENT_MODEL_PATH" ]]
 then
     for i in $SPACED_MODEL_NUMS;
     do
-        $QSUB $TRAIN_SINGLE_PREINIT $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"/model$i" $SOURCE_DEV_FILE $TARGET_DEV_FILE $PRETRAIN_LOCATION 
+	# old style
+	#$QSUB $TRAIN_SINGLE_PREINIT $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"/model$i" $SOURCE_DEV_FILE $TARGET_DEV_FILE $PRETRAIN_LOCATION 
+	# new style
+	cmd="$QSUB $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --HPC_output $TRAIN_MODEL_PATH/model$i/HPC_OUTPUT.txt --rnnbinary $RNN_LOCATION"
+	>&2 echo $cmd;
+	$cmd;
     done
-    exit 0
-elif [[ "$TRAIN_PARENT_MODEL" == "0" ]]; then
-    python $CREATE_MAPPING_PURE $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE "6" "$TRAIN_MODEL_PATH""count6.nn"
 else
-    python $CREATE_MAPPING_PARENT $MAPPING_SOURCE $MAPPING_TARGET "6" "$TRAIN_MODEL_PATH""count6.nn" $SOURCE_TRAIN_FILE
-fi
+    if [[ "$TRAIN_PARENT_MODEL" == "0" ]]; then
+	python $CREATE_MAPPING_PURE $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE "6" "$TRAIN_MODEL_PATH""count6.nn"
+    else
+	python $CREATE_MAPPING_PARENT $MAPPING_SOURCE $MAPPING_TARGET "6" "$TRAIN_MODEL_PATH""count6.nn" $SOURCE_TRAIN_FILE
+    fi
 
 
 
 ### Model settings ###
 
-DROPOUT_SETTING1=""
-DROPOUT_SETTING2=""
-if [[ "$TRAIN_PARENT_MODEL" -eq "1" ]]
-then
-    DROPOUT_SETTING1="-d 0.8"
-else
-    DROPOUT_SETTING1="-d 0.5"
-    DROPOUT_SETTING2="-d 0.5"
+    DROPOUT_SETTING1=""
+    DROPOUT_SETTING2=""
+    if [[ "$TRAIN_PARENT_MODEL" -eq "1" ]]
+    then
+	DROPOUT_SETTING1="-d 0.8"
+    else
+	DROPOUT_SETTING1="-d 0.5"
+	DROPOUT_SETTING2="-d 0.5"
+    fi
+
+    EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
+
+
+    MODEL_1_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING1\""
+    MODEL_2_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING1\""
+    MODEL_3_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING1\""
+    MODEL_4_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING1\""
+    MODEL_5_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING2\""
+    MODEL_6_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING2\""
+    MODEL_7_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING2\""
+    MODEL_8_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING2\""
+    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed_input 1 --screen-print-rate 30 --HPC-output 1 -B best.nn -n $EPOCHS --random-seed 1 -L 100 $EXTRA_RNN_ARGS\""
+    GPU_OPTS_1="\"-M 0 1 1\""
+    GPU_OPTS_2="\"-M 0 0 1 1\""
+
+
+    for i in $SPACED_MODEL_NUMS;
+    do      
+	TEMP="MODEL_${i}_OPTS"
+	CURR_GPU_OPT=$GPU_OPTS_1
+	if [[ $i -eq "2" ]] || [[ $i -eq "4" ]] || [[ $i -eq "6" ]] || [[ $i -eq "8" ]]
+	then
+            CURR_GPU_OPT=$GPU_OPTS_2
+	fi
+	cmd="$QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
+	>&2 echo $cmd;
+	$cmd;
+    done
 fi
 
-EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
-
-
-MODEL_1_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING1\""
-MODEL_2_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING1\""
-MODEL_3_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING1\""
-MODEL_4_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING1\""
-MODEL_5_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING2\""
-MODEL_6_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING2\""
-MODEL_7_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING2\""
-MODEL_8_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING2\""
-SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed_input 1 --screen-print-rate 30 --HPC-output 1 -B best.nn -n $EPOCHS --random-seed 1 -L 100 $EXTRA_RNN_ARGS\""
-GPU_OPTS_1="\"-M 0 1 1\""
-GPU_OPTS_2="\"-M 0 0 1 1\""
-
-
-for i in $SPACED_MODEL_NUMS;
-do      
-    TEMP="MODEL_${i}_OPTS"
-    CURR_GPU_OPT=$GPU_OPTS_1
-    if [[ $i -eq "2" ]] || [[ $i -eq "4" ]] || [[ $i -eq "6" ]] || [[ $i -eq "8" ]]
-    then
-        CURR_GPU_OPT=$GPU_OPTS_2
-    fi
-    cmd="$QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
-    >&2 echo $cmd;
-    $cmd;
-done
 
 exit 0

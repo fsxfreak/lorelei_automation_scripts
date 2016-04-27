@@ -6,7 +6,8 @@ $ENV{'LD_LIBRARY_PATH'}=qq{/usr/usc/cuda/7.0/lib64:$ENV{'LD_LIBRARY_PATH'}};
 
 my ($parent, $trn1, $trn2, $dev1, $dev2, $child) = @ARGV;
 my $usage = 'pretrain.pl parent-model trn1 trn2 dev1 dev2 child-model';
-my $train = '/home/nlg-05/zoph/MT_Experiments/new_experiments_2/deniz_stuff/code/RNN_MODEL';
+#my $train = '/home/nlg-05/zoph/MT_Experiments/new_experiments_2/deniz_stuff/code/RNN_MODEL';
+my $train = '/home/rcf-40/jonmay/projects/lorelei/bznmt/hun/scripts/helper_programs/RNN_MODEL';
 my $opts1 = '-l 0.5 -A 0.9 -d 0.5 -P -0.05 0.05 -L 100 -w 5 --clip-cell 50 1000 -m 128 --attention-model 1 --feed_input 1 --screen-print-rate 300 --random-seed 1';
 my $opts2 = '--train-source-input-embedding true --train-source-RNN true --train-attention-target-RNN true --train-target-RNN true --train-target-input-embedding false --train-target-output-embedding false';
 
