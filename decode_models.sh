@@ -14,6 +14,10 @@ OUTPUT_FILE=""
 BEAM_SIZE="" #make sure beam size is >= kbest_size
 LONGEST_SENT=""
 MODEL_NUMS="1_5_2_6_3_7_4_8" # out of order to avoid putting all the big models on the same gpu
+EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
+QSUBOPTS="" # extra options to pass to qsubrun
+RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
+
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -30,6 +34,9 @@ function HELP {
     echo "${REV}--model_nums${NORM}  : Specify the subset of models (1-8, joined with underscore) you want to use (default is all 8)."
     echo "${REV}--num_best${NORM}  : Per sentence in the input_file, this is the number of decodings the model will output." 
     echo "${REV}--output_file${NORM}  : Specify the location of the output file the model generates." 
+    echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
+    echo "${REV}--rnn_location${NORM}  : Location of the RNN binary."
+    echo "${REV}--qsubopts${NORM}  : Specify any additional option string to pass to qsubrun."
     echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
     echo "Example: ${BOLD}$SCRIPT path/to/decode_models.sh --source_file <source file> --trained_model <path to models> --k_size <number of decodings> --output_file <name and location of output file>  ${NORM}" 
     exit 1
@@ -72,7 +79,19 @@ while [[ $VAR -le $NUM ]]; do
                     output_file)
                         echo "output_file : ""${!OPTIND}"
                         OUTPUT_FILE="${!OPTIND}"
+                        ;;
+                    extra_rnn_args)
+                        >&2 echo "extra_rnn_args : ""${!OPTIND}"
+                        EXTRA_RNN_ARGS="${!OPTIND}"                  
                         ;;      
+                    rnn_location)
+                        >&2 echo "rnn_location : ""${!OPTIND}"
+                        RNN_LOCATION="${!OPTIND}"                  
+                        ;;      
+                    qsubopts)
+                        >&2 echo "qsubopts : ""${!OPTIND}"
+                        QSUBOPTS="${!OPTIND}"                  
+                        ;;            
                     *) #unrecognized long flag
                         echo -e \\n"Option --${BOLD}$OPTARG${NORM} not allowed."
                         HELP    
@@ -203,8 +222,6 @@ check_relative_path "$OUTPUT_FILE"
 check_berk_aligner "$TRAINED_MODELS_PATH"
 
 #paths
-RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
-#RNN_LOCATION="/home/nlg-05/zoph/MT_Experiments/new_experiments_3/char_mt/new_exec/RNN_MODEL"
 BLEU_FORMAT="${DIR}helper_programs/bleu_format.py"
 UNK_REP="${DIR}helper_programs/att_unk_rep.py"
 DECODE_FORMAT="${DIR}helper_programs/decode_format.py"
@@ -227,11 +244,18 @@ for i in $SPACED_MODEL_NUMS; do
         sed -i "1s/.*/$TEMP_FIRST/" $CURR_MODEL_NAME 
     fi
 done
-FINAL_ARGS="\" $RNN_LOCATION -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT \""
+EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
+FINAL_ARGS="\" $RNN_LOCATION -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT $EXTRA_RNN_ARGS \""
 SMART_QSUB="${DIR}helper_programs/qsubrun"
+QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;
+QSUB="$SMART_QSUB";
+if [ ! -z "$QSUBOPTS" ]; then
+    QSUB="$QSUB $QSUBOPTS --";
+fi
+
 DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
 
-$SMART_QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE $BLEU_FORMAT $OUTPUT_FILE $TTABLE $UNK_REP $DECODE_FORMAT $MODEL_NUMS 
+$QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE $BLEU_FORMAT $OUTPUT_FILE $TTABLE $UNK_REP $DECODE_FORMAT $MODEL_NUMS 
 
 exit 0
 
