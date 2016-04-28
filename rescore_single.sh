@@ -1,7 +1,13 @@
 #!/bin/bash
+#PBS -q isi
+#PBS -l walltime=336:00:00
+#PBS -l gpus=2
+
+set -e
 
 #This script was written by barret zoph for questions email barretzoph@gmail.com
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"
 
 #### Things that must be specified by user ####
 SOURCE_RESCORE_FILE="" #Hard path and name of the source file being rescored (e.g. "/home/nlg/source_data.txt")
@@ -9,8 +15,11 @@ TARGET_RESCORE_FILE="" #Hard path and name of the target file being rescored (e.
 MODEL_FILE="" #Hard path and name of the model file being used for rescoring (e.g. "/home/nlg/model.nn")
 SCORE_FILE="" #Name of file that scores are put (e.g. "score.txt")
 MODEL_NUM="1" # model number to use (1-8)
+EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
+RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"
+
+
 
 NORM=`tput sgr0`
 BOLD=`tput bold`
@@ -25,8 +34,10 @@ function HELP {
     echo "${REV}--source${NORM}  : Specify the location of the source data to be rescored." 
     echo "${REV}--target${NORM}  : Specify the location of the target data to be rescored." 
     echo "${REV}--scores${NORM}  : Specify the location of the generated scores files." 
+    echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
+    echo "${REV}--rnn_location${NORM}  : Location of the RNN binary."
     echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
-    echo "Example: ${BOLD}$SCRIPT --model <trained_model> --source <rescore_source> --target <rescore_target> --scores <rescore_scores> ${NORM}" 
+    echo "Example: qsubrun -q isi80 -- ${BOLD}$SCRIPT --model <trained_model> --source <rescore_source> --target <rescore_target> --scores <rescore_scores> ${NORM}" 
     exit 1
 }
 
@@ -74,6 +85,15 @@ while [[ $VAR -le $NUM ]]; do
                         echo "scores = ""${!OPTIND}"
                         SCORE_FILE="${!OPTIND}"
                         ;;
+                    extra_rnn_args)
+                        >&2 echo "extra_rnn_args : ""${!OPTIND}"
+                        EXTRA_RNN_ARGS="${!OPTIND}"                  
+                        ;;      
+                    rnn_location)
+                        >&2 echo "rnn_location : ""${!OPTIND}"
+                        RNN_LOCATION="${!OPTIND}"                  
+                        ;;      
+
                     *) #unrecognized long flag
                         echo -e \\n"Option --${BOLD}$OPTARG${NORM} not allowed."
                         HELP    
@@ -96,7 +116,6 @@ while [[ $VAR -le $NUM ]]; do
     shift 1  #This tells getopts to move on to the next argument.
 done
 ### End getopts code ###
-
 
 
 
@@ -196,8 +215,10 @@ check_valid_file_path () {
     fi
 }
 
+set +e
 check_dir_final_char "$MODEL_FILE"  
 BOOL_COND=$?
+set -e
 if [[ "$BOOL_COND" == 1 ]]; then
     MODEL_FILE=$MODEL_FILE"/"
 fi
@@ -217,13 +238,16 @@ LONGEST_SENT=$( find_longest_sent "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE" 
 MODEL_FILE=$MODEL_FILE"model"$MODEL_NUM"/best.nn"
 
 
-#### Path to Executable ####
-RNN_LOCATION="${DIR}helper_programs/RNN_MODEL"
-FINAL_ARGS="\" $RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT --attention-model 1 --feed_input 1 -m 1 \""
-SMART_QSUB="${DIR}/helper_programs/qsubrun"
-RUN_RESCORE_PREINIT="${DIR}/helper_programs/run_score.sh"
+#### Sets up environment to run code ####
+source /usr/usc/cuda/7.0/setup.sh
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nlg-05/zoph/cudnn_v4/lib64/
+export LD_LIBRARY_PATH
 
-$SMART_QSUB $RUN_RESCORE_PREINIT $FINAL_ARGS
+#### Path to Executable ####
+EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
+FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT --attention-model 1 --feed_input 1 -m 1 $EXTRA_RNN_ARGS"
+echo $FINAL_ARGS;
+$FINAL_ARGS;
 
 exit 0
 
