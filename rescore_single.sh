@@ -16,7 +16,7 @@ MODEL_FILE="" #Hard path and name of the model file being used for rescoring (e.
 SCORE_FILE="" #Name of file that scores are put (e.g. "score.txt")
 MODEL_NUM="1" # model number to use (1-8)
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
-RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
+RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
 
 
 
@@ -245,7 +245,7 @@ export LD_LIBRARY_PATH
 
 #### Path to Executable ####
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
-FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT --attention-model 1 --feed_input 1 -m 1 $EXTRA_RNN_ARGS"
+FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT --attention-model 1 --feed-input 1 -m 1 $EXTRA_RNN_ARGS"
 echo $FINAL_ARGS;
 $FINAL_ARGS;
 

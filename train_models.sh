@@ -23,7 +23,7 @@ MODEL_NUMS="1_2_3_4_5_6_7_8" # which models to train
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
 EPOCHS="100" # how many epochs to train the models
 QSUBOPTS="" # extra options to pass to qsubrun
-RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
+RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -362,10 +362,7 @@ if [[ -n "$PARENT_MODEL_PATH" ]]
 then
     for i in $SPACED_MODEL_NUMS;
     do
-	# old style
-	#$QSUB $TRAIN_SINGLE_PREINIT $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"/model$i" $SOURCE_DEV_FILE $TARGET_DEV_FILE $PRETRAIN_LOCATION 
-	# new style
-	cmd="$QSUB $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --HPC_output $TRAIN_MODEL_PATH/model$i/HPC_OUTPUT.txt --rnnbinary $RNN_LOCATION"
+	cmd="$QSUB $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --logfile $TRAIN_MODEL_PATH/model$i/log --rnnbinary $RNN_LOCATION"
 	>&2 echo $cmd;
 	$cmd;
     done
@@ -401,7 +398,7 @@ else
     MODEL_6_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING2\""
     MODEL_7_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING2\""
     MODEL_8_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING2\""
-    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed_input 1 --screen-print-rate 30 --HPC-output 1 -B best.nn -n $EPOCHS --random-seed 1 -L 100 $EXTRA_RNN_ARGS\""
+    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed-input 1 --screen-print-rate 30 -B best.nn -n $EPOCHS -L 100 $EXTRA_RNN_ARGS " # ending quotes deliberately left off!
     GPU_OPTS_1="\"-M 0 1 1\""
     GPU_OPTS_2="\"-M 0 0 1 1\""
 
@@ -414,7 +411,8 @@ else
 	then
             CURR_GPU_OPT=$GPU_OPTS_2
 	fi
-	cmd="$QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
+	LOCAL_SHARED_OPTS=$SHARED_OPTS" --logfile $TRAIN_MODEL_PATH/model$i/log\"" # deliberately missing beginning quotes
+	cmd="$QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $LOCAL_SHARED_OPTS $RNN_LOCATION"
 	>&2 echo $cmd;
 	$cmd;
     done

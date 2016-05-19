@@ -16,7 +16,7 @@ LONGEST_SENT=""
 MODEL_NUMS="1_5_2_6_3_7_4_8" # out of order to avoid putting all the big models on the same gpu
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
 QSUBOPTS="" # extra options to pass to qsubrun
-RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
+RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
 
 
 #Set fonts for Help.

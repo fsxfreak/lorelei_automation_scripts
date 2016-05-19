@@ -48,7 +48,7 @@ def main():
   parser.add_argument("--traintarget", "-tt", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="train target file")
   parser.add_argument("--devsource", "-ds", help="dev source file")
   parser.add_argument("--devtarget", "-dt", help="dev target file")
-  parser.add_argument("--rnnbinary", default=os.path.join(scriptdir, 'RNN_MODEL'), help="zoph rnn nmt binary")
+  parser.add_argument("--rnnbinary", default=os.path.join(scriptdir, 'ZOPH_RNN'), help="zoph rnn nmt binary")
   parser.add_argument("--child", "-c",  help="output child model file")
   parser.add_argument("--dropout", "-d", type=float, default=0.5, help="dropout rate (1 = always keep)")
   parser.add_argument("--learning_rate", "-l", type=float, default=0.5, help="learning rate")
@@ -60,14 +60,13 @@ def main():
   parser.add_argument("--number_epochs", "-n", type=int, default=100, help="training epochs")
   parser.add_argument("--attention_model", type=bool, default=True, help="use attention model")
   parser.add_argument("--feed_input", type=bool, default=True, help="use feed input")
-  parser.add_argument("--random_seed", type=bool, default=True, help="use random seed")
   parser.add_argument("--train_source_input_embedding", type=bool, default=True)
   parser.add_argument("--train_target_input_embedding", type=bool, default=False)
   parser.add_argument("--train_target_output_embedding", type=bool, default=False)
   parser.add_argument("--train_source_RNN", type=bool, default=True)
   parser.add_argument("--train_target_RNN", type=bool, default=True)
   parser.add_argument("--train_attention_target_RNN", type=bool, default=True)
-  parser.add_argument("--HPC_output", default="./HPC_OUTPUT.txt", help="where to pipe stdout of rnn binary")
+  parser.add_argument("--logfile", default="./log", help="where to pipe stdout of rnn binary")
   parser.add_argument("--other_rnn_arguments", default="", help="other arguments to pass to RNN. fully formed, quoted string")
   parser.add_argument("--cuda_lib_string", default="/home/nlg-05/zoph/cudnn_v4/lib64/:/usr/usc/cuda/7.0/lib64", help="cuda libraries that must be added to LD_LIBRARY_PATH")
 
@@ -134,7 +133,7 @@ def main():
   # launch training
 
   maincmd = "%s -C %s %s %s -B %s -a %s %s %s" % (args.rnnbinary, args.trainsource.name, args.traintarget.name, prechild.name, args.child, args.devsource, args.devtarget, moption)
-  cmdargs = "--dropout %f --learning-rate %f --adaptive-decrease-factor %f --parameter-range %f %f --whole-clip-gradients %f --longest-sent %d --minibatch-size %d --attention-model %d --number-epochs %d --feed_input %d --random-seed %d --train-source-input-embedding %d --train-target-input-embedding %d --train-target-output-embedding %d --train-source-RNN %d --train-target-RNN %d --train-attention-target-RNN %d --HPC-output %s" % (args.dropout, args.learning_rate, args.adaptive_decrease_factor, -args.parameter_range, args.parameter_range, args.whole_clip_gradients, args.longest_sent, args.minibatch_size, args.attention_model, args.number_epochs, args.feed_input, args.random_seed, args.train_source_input_embedding, args.train_target_input_embedding, args.train_target_output_embedding, args.train_source_RNN, args.train_target_RNN, args.train_attention_target_RNN, args.HPC_output)
+  cmdargs = "--dropout %f --learning-rate %f --adaptive-decrease-factor %f --parameter-range %f %f --whole-clip-gradients %f --longest-sent %d --minibatch-size %d --attention-model %d --number-epochs %d --feed-input %d --train-source-input-embedding %d --train-target-input-embedding %d --train-target-output-embedding %d --train-source-RNN %d --train-target-RNN %d --train-attention-target-RNN %d --logfile %s --tmp-dir-location %s" % (args.dropout, args.learning_rate, args.adaptive_decrease_factor, -args.parameter_range, args.parameter_range, args.whole_clip_gradients, args.longest_sent, args.minibatch_size, args.attention_model, args.number_epochs, args.feed_input, args.train_source_input_embedding, args.train_target_input_embedding, args.train_target_output_embedding, args.train_source_RNN, args.train_target_RNN, args.train_attention_target_RNN, args.logfile, workdir)
   cmd="%s %s %s" % (maincmd, cmdargs, args.other_rnn_arguments)
   sys.stderr.write("Executing "+cmd+"\n")
   cmdlist = shlex.split(cmd)

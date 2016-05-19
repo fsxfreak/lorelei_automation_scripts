@@ -5,6 +5,13 @@
 
 set -e
 
+tmpdir=${TMPDIR:-/tmp}
+MTMP=$(mktemp -d --tmpdir=$tmpdir XXXXXX)
+function cleanup() {
+    rm -rf $MTMP;
+}
+trap cleanup EXIT
+
 #This script was written by barret zoph for questions email barretzoph@gmail.com
 #It will return 1 if not successful, 0 if successful
 
@@ -43,7 +50,7 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nlg-05/zoph/cudnn_v4/lib64/
 export LD_LIBRARY_PATH
 
 cd $DIRECTORY
-cmd="$RNN_LOCATION -t $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE model.nn -a $SOURCE_DEV_FILE $TARGET_DEV_FILE $MODEL_OPTS $SHARED_OPTS $GPU_OPTS --train-ensemble ../count6.nn"
+cmd="$RNN_LOCATION -t $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE model.nn -a $SOURCE_DEV_FILE $TARGET_DEV_FILE $MODEL_OPTS $SHARED_OPTS $GPU_OPTS --train-ensemble ../count6.nn --tmp-dir-location $MTMP"
 echo $cmd;
 $cmd;
 
