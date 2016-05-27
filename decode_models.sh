@@ -115,7 +115,7 @@ while [[ $VAR -le $NUM ]]; do
     shift 1
 done
 
-
+SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
 
 #run some input checks
 check_zero_file () {
@@ -148,7 +148,7 @@ check_parent_structure () {
         exit 1
     fi      
     
-    for i in $( seq 1 8 )
+    for i in $SPACED_MODEL_NUMS
     do
         if [[ ! -d "$1""model""$i" ]]
         then
@@ -227,7 +227,7 @@ UNK_REP="${DIR}helper_programs/att_unk_rep.py"
 DECODE_FORMAT="${DIR}helper_programs/decode_format.py"
 TTABLE="${TRAINED_MODELS_PATH}berk_aligner/aligner_output/stage2.2.params.txt"
 MODEL_NAMES=""
-SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
+
 MFLAGS="-M";
 nextgpu=0
 for i in $SPACED_MODEL_NUMS; do    

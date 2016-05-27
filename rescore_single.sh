@@ -21,9 +21,13 @@ RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
 
 
 
-NORM=`tput sgr0`
-BOLD=`tput bold`
-REV=`tput smso`
+# NORM=`tput sgr0`
+# BOLD=`tput bold`
+# REV=`tput smso`
+
+NORM=""
+BOLD=""
+REV=""
 
 #Help function
 function HELP {
