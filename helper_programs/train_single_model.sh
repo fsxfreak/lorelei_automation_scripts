@@ -50,7 +50,7 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nlg-05/zoph/cudnn_v4/lib64/
 export LD_LIBRARY_PATH
 
 cd $DIRECTORY
-cmd="$RNN_LOCATION -t $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE model.nn -a $SOURCE_DEV_FILE $TARGET_DEV_FILE $MODEL_OPTS $SHARED_OPTS $GPU_OPTS --train-ensemble ../count6.nn --tmp-dir-location $MTMP"
+cmd="$RNN_LOCATION -t $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE model.nn -a $SOURCE_DEV_FILE $TARGET_DEV_FILE $MODEL_OPTS $SHARED_OPTS $GPU_OPTS --vocab-mapping-file ../count6.nn --tmp-dir-location $MTMP"
 echo $cmd;
 $cmd;
 
