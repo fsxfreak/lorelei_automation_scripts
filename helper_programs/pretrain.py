@@ -40,12 +40,65 @@ def prepfile(fh, code):
       sys.exit(1)
   return ret
 
+# grabbed from https://hg.python.org/cpython/file/default/Lib/argparse.py
+# written by steven bethard! super cool!
+class py34FileType(object):
+  """Factory for creating file object types
+
+  Instances of FileType are typically passed as type= arguments to the
+  ArgumentParser add_argument() method.
+
+  Keyword Arguments:
+      - mode -- A string indicating how the file is to be opened. Accepts the
+          same values as the builtin open() function.
+      - bufsize -- The file's desired buffer size. Accepts the same values as
+          the builtin open() function.
+      - encoding -- The file's encoding. Accepts the same values as the
+          builtin open() function.
+      - errors -- A string indicating how encoding and decoding errors are to
+          be handled. Accepts the same value as the builtin open() function.
+  """
+
+  def __init__(self, mode='r', bufsize=-1, encoding=None, errors=None):
+    self._mode = mode
+    self._bufsize = bufsize
+    self._encoding = encoding
+    self._errors = errors
+
+  def __call__(self, string):
+    # the special argument "-" means sys.std{in,out}
+    if string == '-':
+      if 'r' in self._mode:
+        return _sys.stdin
+      elif 'w' in self._mode:
+        return _sys.stdout
+      else:
+        msg = _('argument "-" with mode %r') % self._mode
+        raise ValueError(msg)
+
+      # all other arguments are used as file names
+    try:
+      return open(string, self._mode, self._bufsize, self._encoding,
+                  self._errors)
+    except OSError as e:
+      message = _("can't open '%s': %s")
+      raise ArgumentTypeError(message % (string, e))
+
+  def __repr__(self):
+    args = self._mode, self._bufsize
+    kwargs = [('encoding', self._encoding), ('errors', self._errors)]
+    args_str = ', '.join([repr(arg) for arg in args if arg != -1] +
+                         ['%s=%r' % (kw, arg) for kw, arg in kwargs
+                          if arg is not None])
+    return '%s(%s)' % (type(self).__name__, args_str)
+
+
 def main():
   parser = argparse.ArgumentParser(description="python port of yuret/zoph code. train a model initialized with a parent model's params",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument("--parent", "-p", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="parent model file")
-  parser.add_argument("--trainsource", "-ts", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="train source file")
-  parser.add_argument("--traintarget", "-tt", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="train target file")
+  parser.add_argument("--parent", "-p", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="parent model file")
+  parser.add_argument("--trainsource", "-ts", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="train source file")
+  parser.add_argument("--traintarget", "-tt", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="train target file")
   parser.add_argument("--devsource", "-ds", help="dev source file")
   parser.add_argument("--devtarget", "-dt", help="dev target file")
   parser.add_argument("--rnnbinary", default=os.path.join(scriptdir, 'ZOPH_RNN'), help="zoph rnn nmt binary")
@@ -87,7 +140,7 @@ def main():
   parent = prepfile(args.parent, 'r')
   trainsource = prepfile(args.trainsource, 'r')
   traintarget = prepfile(args.traintarget, 'r')
-  prechild = prepfile(open(args.child+".last", 'w'), 'w')
+  prechild = prepfile(open(args.child+".last", 'w', encoding="utf-8"), 'w')
 
 
   # get train source vocab, sorted lexicographically
@@ -101,7 +154,7 @@ def main():
   print("Vocab length %d" % len(vocab))
   # get layer info from parent model
   line = parent.readline()
-  (nlayer, nhidden, ntarget, nsource) = map(int, line.strip().split())
+  (nlayer, nhidden, ntarget, nsource, *_) = map(int, line.strip().split())
   prechild.write(line)
   if len(vocab) < nsource:
     sys.stderr.write("Error: child vocabulary (%d) larger than parent vocabulary (%d)\n" % (len(vocab), nsource))
