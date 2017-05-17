@@ -5,6 +5,13 @@
 
 set -e
 
+tmpdir=${TMPDIR:-/tmp}
+MTMP=$(mktemp -d --tmpdir=$tmpdir XXXXXX)
+function cleanup() {
+    rm -rf $MTMP;
+}
+trap cleanup EXIT
+
 #This script was written by barret zoph for questions email barretzoph@gmail.com
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )""/"
@@ -255,7 +262,7 @@ export LD_LIBRARY_PATH
 
 #### Path to Executable ####
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
-FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT  -m 1 $EXTRA_RNN_ARGS"
+FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT  -m 1 $EXTRA_RNN_ARGS --tmp-dir-location $MTMP"
 echo $FINAL_ARGS;
 $FINAL_ARGS;
 
