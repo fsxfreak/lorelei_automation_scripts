@@ -16,10 +16,14 @@ MODEL_FILE="" #Hard path and name of the model file being used for rescoring (e.
 SCORE_FILE="" #Name of file that scores are put (e.g. "score.txt")
 MODEL_NUM="1" # model number to use (1-8)
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
-RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
+RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
+LOG_FILE=$PWD/logfile
 
 
 
+# NORM=`tput sgr0`
+# BOLD=`tput bold`
+# REV=`tput smso`
 
 NORM=`tput sgr0 -T screen.rxvt`
 BOLD=`tput bold -T screen.rxvt`
@@ -31,6 +35,7 @@ function HELP {
     echo "${BOLD}The following switches are required:${NORM}"
     echo "${REV}--model${NORM}  : Specify the location of the trained NMT models."
     echo "${REV}--model_num${NORM}  : Specify the number of the trained NMT model to use in rescoring."
+    echo "${REV}--log_file${NORM}  : Specify the location of the log file the rnn generates." 
     echo "${REV}--source${NORM}  : Specify the location of the source data to be rescored." 
     echo "${REV}--target${NORM}  : Specify the location of the target data to be rescored." 
     echo "${REV}--scores${NORM}  : Specify the location of the generated scores files." 
@@ -76,6 +81,10 @@ while [[ $VAR -le $NUM ]]; do
                     source)
                         echo "source = ""${!OPTIND}"
                         SOURCE_RESCORE_FILE="${!OPTIND}"
+                        ;;
+                    log_file)
+                        echo "log_file : ""${!OPTIND}"
+                        LOG_FILE="${!OPTIND}"
                         ;;
                     target)
                         echo "target = ""${!OPTIND}"
@@ -228,6 +237,7 @@ check_relative_path "$MODEL_FILE"
 check_relative_path "$SCORE_FILE"
 check_zero_file "$SOURCE_RESCORE_FILE"
 check_zero_file "$TARGET_RESCORE_FILE"
+check_valid_file_path "$LOG_FILE"
 check_parent_structure "$MODEL_FILE"
 check_equal_lines "$SOURCE_RESCORE_FILE" "$TARGET_RESCORE_FILE"
 check_zero_dir "$MODEL_FILE"

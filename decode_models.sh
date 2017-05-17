@@ -11,12 +11,13 @@ INPUT_FILE="" #Hard path and name of the source file being rescored (e.g. "/home
 TRAINED_MODELS_PATH=""
 KBEST_SIZE=""
 OUTPUT_FILE=""
+LOG_FILE=$PWD/logfile
 BEAM_SIZE="" #make sure beam size is >= kbest_size
 LONGEST_SENT=""
 MODEL_NUMS="1_5_2_6_3_7_4_8" # out of order to avoid putting all the big models on the same gpu
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
 QSUBOPTS="" # extra options to pass to qsubrun
-RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
+RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
 
 
 #Set fonts for Help.
@@ -34,6 +35,7 @@ function HELP {
     echo "${REV}--model_nums${NORM}  : Specify the subset of models (1-8, joined with underscore) you want to use (default is all 8)."
     echo "${REV}--num_best${NORM}  : Per sentence in the input_file, this is the number of decodings the model will output." 
     echo "${REV}--output_file${NORM}  : Specify the location of the output file the model generates." 
+    echo "${REV}--log_file${NORM}  : Specify the location of the log file the rnn generates." 
     echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
     echo "${REV}--rnn_location${NORM}  : Location of the RNN binary."
     echo "${REV}--qsubopts${NORM}  : Specify any additional option string to pass to qsubrun."
@@ -80,6 +82,10 @@ while [[ $VAR -le $NUM ]]; do
                         echo "output_file : ""${!OPTIND}"
                         OUTPUT_FILE="${!OPTIND}"
                         ;;
+                    log_file)
+                        echo "log_file : ""${!OPTIND}"
+                        LOG_FILE="${!OPTIND}"
+                        ;;
                     extra_rnn_args)
                         >&2 echo "extra_rnn_args : ""${!OPTIND}"
                         EXTRA_RNN_ARGS="${!OPTIND}"                  
@@ -115,7 +121,7 @@ while [[ $VAR -le $NUM ]]; do
     shift 1
 done
 
-
+SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
 
 #run some input checks
 check_zero_file () {
@@ -148,13 +154,13 @@ check_parent_structure () {
         exit 1
     fi      
     
-    # for i in $( seq 1 8 )
-    # do
-    #     if [[ ! -d "$1""model""$i" ]]
-    #     then
-    #         echo "Error directory ${BOLD}model$i${NORM} in trained_models directory ${BOLD}$1${NORM} does not exist"
-    #         exit 1
-    #     fi
+    for i in $SPACED_MODEL_NUMS
+    do
+        if [[ ! -d "$1""model""$i" ]]
+        then
+            echo "Error directory ${BOLD}model$i${NORM} in trained_models directory ${BOLD}$1${NORM} does not exist"
+            exit 1
+        fi
         
     #     if [[ ! -s $1"model"$i"/best.nn" ]]
     #     then
@@ -216,9 +222,11 @@ fi
 check_parent_structure "$TRAINED_MODELS_PATH"
 LONGEST_SENT=$( wc -L $INPUT_FILE | cut -f1 -d' ' )
 check_valid_file_path "$OUTPUT_FILE"
+check_valid_file_path "$LOG_FILE"
 check_relative_path "$INPUT_FILE"
 check_relative_path "$TRAINED_MODELS_PATH"
 check_relative_path "$OUTPUT_FILE"
+check_relative_path "$LOG_FILE"
 check_berk_aligner "$TRAINED_MODELS_PATH"
 
 #paths
@@ -227,7 +235,7 @@ UNK_REP="${DIR}helper_programs/att_unk_rep.py"
 DECODE_FORMAT="${DIR}helper_programs/decode_format.py"
 TTABLE="${TRAINED_MODELS_PATH}berk_aligner/aligner_output/stage2.2.params.txt"
 MODEL_NAMES=""
-SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
+
 MFLAGS="-M";
 nextgpu=0
 for i in $SPACED_MODEL_NUMS; do    
@@ -245,7 +253,7 @@ for i in $SPACED_MODEL_NUMS; do
     fi
 done
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
-FINAL_ARGS="\" $RNN_LOCATION -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT $EXTRA_RNN_ARGS \""
+FINAL_ARGS="\" $RNN_LOCATION --logfile $LOG_FILE -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT $EXTRA_RNN_ARGS \""
 SMART_QSUB="${DIR}helper_programs/qsubrun"
 QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;
 QSUB="$SMART_QSUB";

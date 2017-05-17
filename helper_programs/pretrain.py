@@ -46,15 +46,68 @@ def replacevocab(parent, prechild, expected_size, textfile):
   most frequent elements from textfile '''
   pass
 
+# grabbed from https://hg.python.org/cpython/file/default/Lib/argparse.py
+# written by steven bethard! super cool!
+class py34FileType(object):
+  """Factory for creating file object types
+
+  Instances of FileType are typically passed as type= arguments to the
+  ArgumentParser add_argument() method.
+
+  Keyword Arguments:
+      - mode -- A string indicating how the file is to be opened. Accepts the
+          same values as the builtin open() function.
+      - bufsize -- The file's desired buffer size. Accepts the same values as
+          the builtin open() function.
+      - encoding -- The file's encoding. Accepts the same values as the
+          builtin open() function.
+      - errors -- A string indicating how encoding and decoding errors are to
+          be handled. Accepts the same value as the builtin open() function.
+  """
+
+  def __init__(self, mode='r', bufsize=-1, encoding=None, errors=None):
+    self._mode = mode
+    self._bufsize = bufsize
+    self._encoding = encoding
+    self._errors = errors
+
+  def __call__(self, string):
+    # the special argument "-" means sys.std{in,out}
+    if string == '-':
+      if 'r' in self._mode:
+        return _sys.stdin
+      elif 'w' in self._mode:
+        return _sys.stdout
+      else:
+        msg = _('argument "-" with mode %r') % self._mode
+        raise ValueError(msg)
+
+      # all other arguments are used as file names
+    try:
+      return open(string, self._mode, self._bufsize, self._encoding,
+                  self._errors)
+    except OSError as e:
+      message = _("can't open '%s': %s")
+      raise ArgumentTypeError(message % (string, e))
+
+  def __repr__(self):
+    args = self._mode, self._bufsize
+    kwargs = [('encoding', self._encoding), ('errors', self._errors)]
+    args_str = ', '.join([repr(arg) for arg in args if arg != -1] +
+                         ['%s=%r' % (kw, arg) for kw, arg in kwargs
+                          if arg is not None])
+    return '%s(%s)' % (type(self).__name__, args_str)
+
+
 def main():
   parser = argparse.ArgumentParser(description="python port of yuret/zoph code. train a model initialized with a parent model's params",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument("--parent", "-p", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="parent model file")
-  parser.add_argument("--trainsource", "-ts", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="train source file")
-  parser.add_argument("--traintarget", "-tt", nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="train target file")
+  parser.add_argument("--parent", "-p", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="parent model file")
+  parser.add_argument("--trainsource", "-ts", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="train source file")
+  parser.add_argument("--traintarget", "-tt", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="train target file")
   parser.add_argument("--devsource", "-ds", help="dev source file")
   parser.add_argument("--devtarget", "-dt", help="dev target file")
-  parser.add_argument("--rnnbinary", default=os.path.join(scriptdir, 'RNN_MODEL'), help="zoph rnn nmt binary")
+  parser.add_argument("--rnnbinary", default=os.path.join(scriptdir, 'ZOPH_RNN'), help="zoph rnn nmt binary")
   parser.add_argument("--child", "-c",  help="output child model file")
   parser.add_argument("--dropout", "-d", type=float, default=0.5, help="dropout rate (1 = always keep)")
   parser.add_argument("--learning_rate", "-l", type=float, default=0.5, help="learning rate")
@@ -73,7 +126,7 @@ def main():
   parser.add_argument("--train_source_RNN", type=bool, default=True)
   parser.add_argument("--train_target_RNN", type=bool, default=True)
   parser.add_argument("--train_attention_target_RNN", type=bool, default=True)
-  parser.add_argument("--logfile", default="./HPC_OUTPUT.txt", help="where to pipe stdout of rnn binary")
+  parser.add_argument("--logfile", default="./log", help="where to pipe stdout of rnn binary")
   parser.add_argument("--other_rnn_arguments", default="", help="other arguments to pass to RNN. fully formed, quoted string")
   parser.add_argument("--cuda_lib_string", default="/usr/usc/cuDNN/7.5-v5.1/lib64/:/usr/usc/cuda/8.0/lib64", help="cuda libraries that must be added to LD_LIBRARY_PATH")
 
@@ -94,7 +147,7 @@ def main():
   parent = prepfile(args.parent, 'r')
   trainsource = prepfile(args.trainsource, 'r')
   traintarget = prepfile(args.traintarget, 'r')
-  prechild = prepfile(open(args.child+".last", 'w'), 'w')
+  prechild = prepfile(open(args.child+".last", 'w', encoding="utf-8"), 'w')
 
 
   # get train source vocab, sorted lexicographically
@@ -158,6 +211,7 @@ def main():
     ("train-target-RNN",		   [args.train_target_RNN]),			  
     ("train-attention-target-RNN",	   [args.train_attention_target_RNN]),		  
     ("logfile",			   [args.logfile]),                                  
+    ("tmp-dir-location",			   [workdir]),                                  
   ]
   if args.random_seed is not None:
     cmdargs.append(("random-seed",[args.random_seed]))

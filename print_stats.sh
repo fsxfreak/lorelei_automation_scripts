@@ -143,7 +143,7 @@ check_relative_path "$MODEL_DIR"
 
 touch $OUTPUT_DIR"info.txt"
 for i in $( seq 1 8 ); do
-	python $DIR"helper_programs/make_graph.py" $MODEL_DIR"model${i}/HPC_OUTPUT.txt" $OUTPUT_DIR $i  $OUTPUT_DIR"info.txt"
+	python $DIR"helper_programs/make_graph.py" $MODEL_DIR"model${i}/log" $OUTPUT_DIR $i  $OUTPUT_DIR"info.txt"
 	 
 done
 
