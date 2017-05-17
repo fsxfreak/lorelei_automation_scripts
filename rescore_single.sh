@@ -21,9 +21,9 @@ RNN_LOCATION="${DIR}/helper_programs/RNN_MODEL"
 
 
 
-NORM=`tput sgr0`
-BOLD=`tput bold`
-REV=`tput smso`
+NORM=`tput sgr0 -T screen.rxvt`
+BOLD=`tput bold -T screen.rxvt`
+REV=`tput smso -T screen.rxvt`
 
 #Help function
 function HELP {
@@ -239,13 +239,13 @@ MODEL_FILE=$MODEL_FILE"model"$MODEL_NUM"/best.nn"
 
 
 #### Sets up environment to run code ####
-source /usr/usc/cuda/7.0/setup.sh
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nlg-05/zoph/cudnn_v4/lib64/
+source /usr/usc/cuda/7.5/setup.sh
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/usc/cuDNN/7.5-v5.1/lib64/
 export LD_LIBRARY_PATH
 
 #### Path to Executable ####
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
-FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT --attention-model 1 --feed_input 1 -m 1 $EXTRA_RNN_ARGS"
+FINAL_ARGS="$RNN_LOCATION -f $SOURCE_RESCORE_FILE $TARGET_RESCORE_FILE $MODEL_FILE $SCORE_FILE -L $LONGEST_SENT  -m 1 $EXTRA_RNN_ARGS"
 echo $FINAL_ARGS;
 $FINAL_ARGS;
 

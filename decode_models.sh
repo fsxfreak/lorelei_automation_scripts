@@ -148,20 +148,20 @@ check_parent_structure () {
         exit 1
     fi      
     
-    for i in $( seq 1 8 )
-    do
-        if [[ ! -d "$1""model""$i" ]]
-        then
-            echo "Error directory ${BOLD}model$i${NORM} in trained_models directory ${BOLD}$1${NORM} does not exist"
-            exit 1
-        fi
+    # for i in $( seq 1 8 )
+    # do
+    #     if [[ ! -d "$1""model""$i" ]]
+    #     then
+    #         echo "Error directory ${BOLD}model$i${NORM} in trained_models directory ${BOLD}$1${NORM} does not exist"
+    #         exit 1
+    #     fi
         
-        if [[ ! -s $1"model"$i"/best.nn" ]]
-        then
-            echo "Error model file ${BOLD}$1"model"$i"/best.nn"${NORM} does not exist"
-            exit 1
-        fi
-    done
+    #     if [[ ! -s $1"model"$i"/best.nn" ]]
+    #     then
+    #         echo "Error model file ${BOLD}$1"model"$i"/best.nn"${NORM} does not exist"
+    #         exit 1
+    #     fi
+    # done
 }
 
 check_dir_final_char () {

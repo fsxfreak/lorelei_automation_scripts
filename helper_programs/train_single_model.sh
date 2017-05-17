@@ -38,12 +38,12 @@ echo "RNN_LOCAION = $RNN_LOCATION"
 
 
 #### Sets up environment to run code ####
-source /usr/usc/cuda/7.0/setup.sh
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nlg-05/zoph/cudnn_v4/lib64/
+source /usr/usc/cuda/7.5/setup.sh
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/usc/cuDNN/7.5-v5.1/lib64/
 export LD_LIBRARY_PATH
 
 cd $DIRECTORY
-cmd="$RNN_LOCATION -t $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE model.nn -a $SOURCE_DEV_FILE $TARGET_DEV_FILE $MODEL_OPTS $SHARED_OPTS $GPU_OPTS --train-ensemble ../count6.nn"
+cmd="$RNN_LOCATION -t $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE model.nn -a $SOURCE_DEV_FILE $TARGET_DEV_FILE $MODEL_OPTS $SHARED_OPTS $GPU_OPTS --vocab-mapping-file ../count6.nn --logfile train.log"
 echo $cmd;
 $cmd;
 

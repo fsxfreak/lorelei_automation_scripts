@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+#PBS -q isi
+#PBS -l walltime=1:00:00
+
 # code by Jon May [jonmay@isi.edu]
 import argparse
 import sys
@@ -36,6 +39,7 @@ def main():
   parser = argparse.ArgumentParser(description="given data from nmt rescoring, convert it to something appropriate for appending to sbmt nbest files",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument("--infiles", "-i", nargs='+', type=argparse.FileType('r'), default=[sys.stdin,], help="input files; each is whitespace-separated log prob; all must have same number of lines")
+  parser.add_argument("--amendfile", "-a", type=argparse.FileType('r'), default=[sys.stdin,], help="original nbest file; should match in number of lines to infiles")
   parser.add_argument("--outfile", "-o", nargs='?', type=argparse.FileType('w'), default=sys.stdout, help="output file; space-separated feat=val where val is negative log prob")
   parser.add_argument("--prefix", "-p", type=str, default='nmt', help='prefix for name of features')
 
@@ -54,13 +58,16 @@ def main():
   infiles = []
   for ifh in args.infiles:
     infiles.append(prepfile(ifh, 'r'))
+  amendfile = prepfile(args.amendfile, 'r')
+
   outfile = prepfile(args.outfile, 'w')
 
   tuplen = -1
   featurenames = []
-  for ln, tup in enumerate(izip(*infiles), start=1):
+  for ln, tup in enumerate(izip(amendfile, *infiles), start=1):
     vals = []
-    for line in tup:
+    prev = tup[0]
+    for line in tup[1:]:
       for val in line.strip().split():
         featname = "%s_%d" % (args.prefix, len(vals)) 
         if tuplen == -1:
@@ -71,7 +78,7 @@ def main():
     elif len(vals) != tuplen:
       sys.stderr.write("Expected all lines to have %d items but got %d at line %d\n" % (tuplen, len(vals), ln))
       sys.exit(1)
-    outfile.write(' '.join(vals)+"\n")
+    outfile.write(prev.strip()+" "+' '.join(vals)+"\n")
   sys.stdout.write(' '.join(featurenames)+"\n")
 if __name__ == '__main__':
   main()

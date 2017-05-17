@@ -40,6 +40,12 @@ def prepfile(fh, code):
       sys.exit(1)
   return ret
 
+
+def replacevocab(parent, prechild, expected_size, textfile):
+  ''' replicate parent to prechild, replacing vocabulary items with 
+  most frequent elements from textfile '''
+  pass
+
 def main():
   parser = argparse.ArgumentParser(description="python port of yuret/zoph code. train a model initialized with a parent model's params",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -60,16 +66,16 @@ def main():
   parser.add_argument("--number_epochs", "-n", type=int, default=100, help="training epochs")
   parser.add_argument("--attention_model", type=bool, default=True, help="use attention model")
   parser.add_argument("--feed_input", type=bool, default=True, help="use feed input")
-  parser.add_argument("--random_seed", type=bool, default=True, help="use random seed")
+  parser.add_argument("--random_seed", type=float, default=None, help="use this seed instead of random")
   parser.add_argument("--train_source_input_embedding", type=bool, default=True)
   parser.add_argument("--train_target_input_embedding", type=bool, default=False)
   parser.add_argument("--train_target_output_embedding", type=bool, default=False)
   parser.add_argument("--train_source_RNN", type=bool, default=True)
   parser.add_argument("--train_target_RNN", type=bool, default=True)
   parser.add_argument("--train_attention_target_RNN", type=bool, default=True)
-  parser.add_argument("--HPC_output", default="./HPC_OUTPUT.txt", help="where to pipe stdout of rnn binary")
+  parser.add_argument("--logfile", default="./HPC_OUTPUT.txt", help="where to pipe stdout of rnn binary")
   parser.add_argument("--other_rnn_arguments", default="", help="other arguments to pass to RNN. fully formed, quoted string")
-  parser.add_argument("--cuda_lib_string", default="/home/nlg-05/zoph/cudnn_v4/lib64/:/usr/usc/cuda/7.0/lib64", help="cuda libraries that must be added to LD_LIBRARY_PATH")
+  parser.add_argument("--cuda_lib_string", default="/usr/usc/cuDNN/7.5-v5.1/lib64/:/usr/usc/cuda/8.0/lib64", help="cuda libraries that must be added to LD_LIBRARY_PATH")
 
   # TODO: options; as string or separately?
 
@@ -102,10 +108,10 @@ def main():
   print("Vocab length %d" % len(vocab))
   # get layer info from parent model
   line = parent.readline()
-  (nlayer, nhidden, ntarget, nsource) = map(int, line.strip().split())
+  (nlayer, nhidden, ntarget, nsource) = map(int, line.strip().split()[:4])
   prechild.write(line)
   if len(vocab) < nsource:
-    sys.stderr.write("Error: child vocabulary (%d) larger than parent vocabulary (%d)\n" % (len(vocab), nsource))
+    sys.stderr.write("Error: child vocabulary (%d) smaller than parent vocabulary (%d)\n" % (len(vocab), nsource))
     sys.exit(1)
   moption = "-M "+"0 "*(nlayer-1)+"1 1"
   line = parent.readline()
@@ -134,8 +140,31 @@ def main():
   # launch training
 
   maincmd = "%s -C %s %s %s -B %s -a %s %s %s" % (args.rnnbinary, args.trainsource.name, args.traintarget.name, prechild.name, args.child, args.devsource, args.devtarget, moption)
-  cmdargs = "--dropout %f --learning-rate %f --adaptive-decrease-factor %f --parameter-range %f %f --whole-clip-gradients %f --longest-sent %d --minibatch-size %d --attention-model %d --number-epochs %d --feed_input %d --random-seed %d --train-source-input-embedding %d --train-target-input-embedding %d --train-target-output-embedding %d --train-source-RNN %d --train-target-RNN %d --train-attention-target-RNN %d --HPC-output %s" % (args.dropout, args.learning_rate, args.adaptive_decrease_factor, -args.parameter_range, args.parameter_range, args.whole_clip_gradients, args.longest_sent, args.minibatch_size, args.attention_model, args.number_epochs, args.feed_input, args.random_seed, args.train_source_input_embedding, args.train_target_input_embedding, args.train_target_output_embedding, args.train_source_RNN, args.train_target_RNN, args.train_attention_target_RNN, args.HPC_output)
-  cmd="%s %s %s" % (maincmd, cmdargs, args.other_rnn_arguments)
+  cmdargs = [
+    ("dropout",                        [args.dropout]),				  
+    ("learning-rate",		   [args.learning_rate]),				  
+    ("adaptive-decrease-factor",	   [args.adaptive_decrease_factor]),		  
+    ("parameter-range",		   [-args.parameter_range, args.parameter_range]),	  
+    ("whole-clip-gradients",	   [args.whole_clip_gradients]),			  
+    ("longest-sent",		   [args.longest_sent]),				  
+    ("minibatch-size",		   [args.minibatch_size]),				  
+    ("attention-model",		   [args.attention_model]),			  
+    ("number-epochs",		   [args.number_epochs]),				  
+    ("feed-input",			   [args.feed_input]),				  
+    ("train-source-input-embedding",   [args.train_source_input_embedding]),		  
+    ("train-target-input-embedding",   [args.train_target_input_embedding]),		  
+    ("train-target-output-embedding",  [args.train_target_output_embedding]),		  
+    ("train-source-RNN",		   [args.train_source_RNN]),			  
+    ("train-target-RNN",		   [args.train_target_RNN]),			  
+    ("train-attention-target-RNN",	   [args.train_attention_target_RNN]),		  
+    ("logfile",			   [args.logfile]),                                  
+  ]
+  if args.random_seed is not None:
+    cmdargs.append(("random-seed",[args.random_seed]))
+  cmdstring = ""
+  for label , vals in cmdargs:
+    cmdstring += " --{} {}".format(label, ' '.join(map(str, vals)))
+  cmd="%s %s %s" % (maincmd, cmdstring, args.other_rnn_arguments)
   sys.stderr.write("Executing "+cmd+"\n")
   cmdlist = shlex.split(cmd)
   sys.exit(check_call(cmdlist, env=dict(os.environ, **{"LD_LIBRARY_PATH":"%s:%s" % (os.environ["LD_LIBRARY_PATH"], args.cuda_lib_string)})))

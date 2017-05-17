@@ -38,7 +38,7 @@ echo "FINAL_DATA = $FINAL_DATA"
 echo "MTMP = $MTMP"
 cd $MTMP/
 touch "tmp.txt"
-FINAL_ARGS=$FINAL_ARGS" --kbest-source-files-main $FINAL_DATA --UNK-decode unks.txt"
+FINAL_ARGS=$FINAL_ARGS" --decode-main-data-files $FINAL_DATA --UNK-decode unks.txt"
 echo $FINAL_ARGS
 $FINAL_ARGS
 cp $OUTPUT_FILE "tmp.txt"

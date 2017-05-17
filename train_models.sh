@@ -317,14 +317,9 @@ create_new_dir "$TRAIN_MODEL_PATH" "$PARENT_MODEL_PATH"
 ### Path to executables ###
 
 
-# old style
-#PRETRAIN_LOCATION="${DIR}/helper_programs/pretrain.pl"
-# new style
 PRETRAIN_LOCATION="${DIR}/helper_programs/pretrain.py"
 SMARTQSUB="${DIR}/helper_programs/qsubrun"
 TRAIN_SINGLE_NORMAL="${DIR}/helper_programs/train_single_model.sh"
-# old style: remove me!
-TRAIN_SINGLE_PREINIT="${DIR}/helper_programs/train_preinit_model.sh"
 
 CREATE_MAPPING_PURE="${DIR}/helper_programs/create_mapping_pureNMT.py"
 CREATE_MAPPING_PARENT="${DIR}/helper_programs/create_mapping_parent.py"
@@ -332,10 +327,7 @@ BERK_ALIGN="${DIR}/helper_programs/berk_align.sh"
 
 QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;
 
-QSUB="$SMARTQSUB";
-if [ ! -z "$QSUBOPTS" ]; then
-    QSUB="$QSUB $QSUBOPTS --";
-fi
+QSUB="$SMARTQSUB $QSUBOPTS";
 
 
 #create the berkeley aligner
@@ -351,7 +343,7 @@ if [[ "$RUN_BERKELEY_ALIGNER" == "1" ]]; then
     cp ${DIR}"/helper_programs/align" $TRAIN_MODEL_PATH"berk_aligner"
     cp ${DIR}"/helper_programs/berkeleyaligner.jar" $TRAIN_MODEL_PATH"berk_aligner"
     cp ${DIR}"/helper_programs/unk_replace.conf" $TRAIN_MODEL_PATH"berk_aligner"
-    cmd="$QSUB $BERK_ALIGN $TRAIN_MODEL_PATH\"berk_aligner\""
+    cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/berk_aligner/align.monitor -- $BERK_ALIGN $TRAIN_MODEL_PATH\"berk_aligner\""
     >&2 echo $cmd;
     $cmd;
 fi
@@ -362,10 +354,7 @@ if [[ -n "$PARENT_MODEL_PATH" ]]
 then
     for i in $SPACED_MODEL_NUMS;
     do
-	# old style
-	#$QSUB $TRAIN_SINGLE_PREINIT $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH"/model$i" $SOURCE_DEV_FILE $TARGET_DEV_FILE $PRETRAIN_LOCATION 
-	# new style
-	cmd="$QSUB $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --HPC_output $TRAIN_MODEL_PATH/model$i/HPC_OUTPUT.txt --rnnbinary $RNN_LOCATION"
+	cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/model$i/train.monitor -- $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --logfile $TRAIN_MODEL_PATH/model$i/train.log --rnnbinary $RNN_LOCATION"
 	>&2 echo $cmd;
 	$cmd;
     done
@@ -401,7 +390,7 @@ else
     MODEL_6_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING2\""
     MODEL_7_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING2\""
     MODEL_8_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING2\""
-    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed_input 1 --screen-print-rate 30 --HPC-output 1 -B best.nn -n $EPOCHS --random-seed 1 -L 100 $EXTRA_RNN_ARGS\""
+    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed-input 1 --screen-print-rate 30 -B best.nn -n $EPOCHS -L 100 $EXTRA_RNN_ARGS\""
     GPU_OPTS_1="\"-M 0 1 1\""
     GPU_OPTS_2="\"-M 0 0 1 1\""
 
@@ -414,7 +403,7 @@ else
 	then
             CURR_GPU_OPT=$GPU_OPTS_2
 	fi
-	cmd="$QSUB $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
+	cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/model$i/train.monitor -- $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
 	>&2 echo $cmd;
 	$cmd;
     done

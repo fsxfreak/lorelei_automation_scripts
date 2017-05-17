@@ -26,8 +26,8 @@ PRETRAIN_PATH=$6 #location of the pretrain.pl script
 
 
 #### Sets up environment to run code ####
-source /usr/usc/cuda/7.0/setup.sh
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nlg-05/zoph/cudnn_v4/lib64/
+source /usr/usc/cuda/7.5/setup.sh
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/usc/cuDNN/7.5-v5.1/lib64/
 export LD_LIBRARY_PATH
 
 cd $DIRECTORY
