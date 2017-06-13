@@ -21,6 +21,7 @@ MAPPING_TARGET="" #If training a parent model, then supply child source and targ
 PARENT_MODEL_PATH="" #Where the parent models have trained
 MODEL_NUMS="1_2_3_4_5_6_7_8" # which models to train
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
+EXTRA_PRETRAIN_ARGS="" # user-passed arguments to pretraining
 EPOCHS="100" # how many epochs to train the models
 QSUBOPTS="" # extra options to pass to qsubrun
 RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
@@ -47,6 +48,7 @@ function HELP {
     echo "${REV}--mapping_target_data${NORM}  : If --train_parent_model is 1, then input the location of the child target training data."
     echo "${REV}--parent_model${NORM}  : Specify the location of the parent models for option 0. Only do this if you are training pre-initialized child models." 
     echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
+    echo "${REV}--extra_pretrain_args${NORM}  : Specify any additional argument string to pass to pretrainer (transfer learning)."
     echo "${REV}--rnn_location${NORM}  : Location of the RNN binary."
     echo "${REV}--qsubopts${NORM}  : Specify any additional option string to pass to qsubrun."
     echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
@@ -131,6 +133,10 @@ while [[ $VAR -le $NUM ]]; do
                     extra_rnn_args)
                         >&2 echo "extra_rnn_args : ""${!OPTIND}"
                         EXTRA_RNN_ARGS="${!OPTIND}"                  
+                        ;;      
+                    extra_pretrain_args)
+                        >&2 echo "extra_pretrain_args : ""${!OPTIND}"
+                        EXTRA_PRETRAIN_ARGS="${!OPTIND}"                  
                         ;;      
                     rnn_location)
                         >&2 echo "rnn_location : ""${!OPTIND}"
@@ -348,13 +354,14 @@ if [[ "$RUN_BERKELEY_ALIGNER" == "1" ]]; then
     $cmd;
 fi
 
+EXTRA_PRETRAIN_ARGS=`echo $EXTRA_PRETRAIN_ARGS | sed 's/__/--/g'`;
 
 ### Check if doing preinitialization and if so launch the models  ###
 if [[ -n "$PARENT_MODEL_PATH" ]]
 then
     for i in $SPACED_MODEL_NUMS;
     do
-	cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/model$i/train.monitor -- $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --logfile $TRAIN_MODEL_PATH/model$i/train.log --rnnbinary $RNN_LOCATION"
+	cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/model$i/train.monitor -- $PRETRAIN_LOCATION --parent $TRAIN_MODEL_PATH/model$i/parent.nn -ts $SOURCE_TRAIN_FILE -tt $TARGET_TRAIN_FILE -ds $SOURCE_DEV_FILE -dt $TARGET_DEV_FILE -c $TRAIN_MODEL_PATH/model$i/best.nn -n $EPOCHS --logfile $TRAIN_MODEL_PATH/model$i/train.log --rnnbinary $RNN_LOCATION $EXTRA_PRETRAIN_ARGS"
 	>&2 echo $cmd;
 	$cmd;
     done
@@ -382,6 +389,7 @@ else
     EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
 
 
+
     MODEL_1_OPTS="\"-H 750 -N 2 $DROPOUT_SETTING1\""
     MODEL_2_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING1\""
     MODEL_3_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING1\""
@@ -390,7 +398,7 @@ else
     MODEL_6_OPTS="\"-H 750 -N 3 $DROPOUT_SETTING2\""
     MODEL_7_OPTS="\"-H 1000 -N 2 $DROPOUT_SETTING2\""
     MODEL_8_OPTS="\"-H 1000 -N 3 $DROPOUT_SETTING2\""
-    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed-input 1 --screen-print-rate 30 -B best.nn -n $EPOCHS -L 100 $EXTRA_RNN_ARGS " # ending quotes deliberately left off!
+    SHARED_OPTS="\"-m 128 -l 0.5 -P -0.08 0.08 -w 5 --attention-model 1 --feed-input 1 --screen-print-rate 30 -B best.nn -n $EPOCHS -L 100 $EXTRA_RNN_ARGS \""
     GPU_OPTS_1="\"-M 0 1 1\""
     GPU_OPTS_2="\"-M 0 0 1 1\""
 
@@ -403,8 +411,7 @@ else
 	then
             CURR_GPU_OPT=$GPU_OPTS_2
 	fi
-	LOCAL_SHARED_OPTS=$SHARED_OPTS" --logfile $TRAIN_MODEL_PATH/model$i/log\"" # deliberately missing beginning quotes
-	cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/model$i/train.monitor -- $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $LOCAL_SHARED_OPTS $RNN_LOCATION"
+	cmd="$QSUB -j oe -o $TRAIN_MODEL_PATH/model$i/train.monitor -- $TRAIN_SINGLE_NORMAL $SOURCE_TRAIN_FILE $TARGET_TRAIN_FILE $TRAIN_MODEL_PATH\"model$i\" $SOURCE_DEV_FILE $TARGET_DEV_FILE ${!TEMP} $CURR_GPU_OPT $SHARED_OPTS $RNN_LOCATION"
 	>&2 echo $cmd;
 	$cmd;
     done

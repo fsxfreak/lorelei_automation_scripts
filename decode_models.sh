@@ -18,7 +18,7 @@ MODEL_NUMS="1_5_2_6_3_7_4_8" # out of order to avoid putting all the big models 
 EXTRA_RNN_ARGS="" # user-passed arguments to the RNN binary
 QSUBOPTS="" # extra options to pass to qsubrun
 RNN_LOCATION="${DIR}/helper_programs/ZOPH_RNN"
-
+NOQSUB=0 # if set to 1, run locally
 
 #Set fonts for Help.
 NORM=`tput sgr0`
@@ -39,6 +39,7 @@ function HELP {
     echo "${REV}--extra_rnn_args${NORM}  : Specify any additional argument string to pass to the RNN binary."
     echo "${REV}--rnn_location${NORM}  : Location of the RNN binary."
     echo "${REV}--qsubopts${NORM}  : Specify any additional option string to pass to qsubrun."
+    echo "${REV}--noqsub${NORM}  : Run locally. qsubopts are ignored."
     echo -e "${REV}-h${NORM}  : Displays this help message. No further functions are performed."\\n
     echo "Example: ${BOLD}$SCRIPT path/to/decode_models.sh --source_file <source file> --trained_model <path to models> --k_size <number of decodings> --output_file <name and location of output file>  ${NORM}" 
     exit 1
@@ -98,6 +99,11 @@ while [[ $VAR -le $NUM ]]; do
                         >&2 echo "qsubopts : ""${!OPTIND}"
                         QSUBOPTS="${!OPTIND}"                  
                         ;;            
+                    noqsub)
+                        >&2 echo "noqsub : ""${!OPTIND}"
+                        NOQSUB="${!OPTIND}"                  
+                        ;;            
+
                     *) #unrecognized long flag
                         echo -e \\n"Option --${BOLD}$OPTARG${NORM} not allowed."
                         HELP    
@@ -162,12 +168,12 @@ check_parent_structure () {
             exit 1
         fi
         
-    #     if [[ ! -s $1"model"$i"/best.nn" ]]
-    #     then
-    #         echo "Error model file ${BOLD}$1"model"$i"/best.nn"${NORM} does not exist"
-    #         exit 1
-    #     fi
-    # done
+        if [[ ! -s $1"model"$i"/best.nn" ]]
+        then
+            echo "Error model file ${BOLD}$1"model"$i"/best.nn"${NORM} does not exist"
+            exit 1
+        fi
+    done
 }
 
 check_dir_final_char () {
@@ -254,16 +260,20 @@ for i in $SPACED_MODEL_NUMS; do
 done
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
 FINAL_ARGS="\" $RNN_LOCATION --logfile $LOG_FILE -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT $EXTRA_RNN_ARGS \""
-SMART_QSUB="${DIR}helper_programs/qsubrun"
-QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;
-QSUB="$SMART_QSUB";
-if [ ! -z "$QSUBOPTS" ]; then
-    QSUB="$QSUB $QSUBOPTS --";
+DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
+if [[ $NOQSUB == 0 ]]; then
+    SMART_QSUB="${DIR}helper_programs/qsubrun"
+    QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;
+    QSUB="$SMART_QSUB";
+    if [ ! -z "$QSUBOPTS" ]; then
+	QSUB="$QSUB $QSUBOPTS -- ";
+    fi
+    $QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE $BLEU_FORMAT $OUTPUT_FILE $TTABLE $UNK_REP $DECODE_FORMAT $MODEL_NUMS;
+else
+    cmd="$DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE $BLEU_FORMAT $OUTPUT_FILE $TTABLE $UNK_REP $DECODE_FORMAT $MODEL_NUMS";
+    echo $cmd;
+    exec $cmd;
 fi
 
-DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
-
-$QSUB $DECODE_SCRIPT $FINAL_ARGS $INPUT_FILE $BLEU_FORMAT $OUTPUT_FILE $TTABLE $UNK_REP $DECODE_FORMAT $MODEL_NUMS 
-
-exit 0
+exit $?
 

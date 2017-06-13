@@ -41,10 +41,41 @@ def prepfile(fh, code):
   return ret
 
 
-def replacevocab(parent, prechild, expected_size, textfile):
+def replacevocab(parent, prechild, expected_size, textfile, skips):
   ''' replicate parent to prechild, replacing vocabulary items with 
   most frequent elements from textfile '''
-  pass
+  # get train source vocab, sorted lexicographically
+  vocab = dd(int)
+  for line in textfile:
+    for tok in line.strip().split():
+      vocab[tok]+=1
+
+  print("Vocab length %d" % len(vocab))
+  if len(vocab) < expected_size:
+    sys.stderr.write("Error: child vocabulary (%d) smaller than parent vocabulary (%d); will be adding fillers\n" % (len(vocab), expected_size))
+    nextid=0
+    while len(vocab) < expected_size:
+      vocab["TRANSFER_FILLER_{}".format(nextid)]+=1
+      nextid+=1
+  # vocabulary sorted by frequency, most frequent first
+  vocab = list(map (lambda x: x[0], sorted(vocab.items(), key=operator.itemgetter(1), reverse=True)))
+
+  # replace parent vocab with child vocab
+  for skipid in range(skips):
+    line = parent.readline()
+    if re.match("^{} <".format(skipid), line) is None:
+      sys.stderr.write("Error: unexpected line "+line)
+      sys.exit(1)
+    prechild.write(line)
+  for line in parent:
+    if re.match("^=+$", line) is not None:
+      prechild.write(line)
+      break
+    i, _ = line.strip().split()
+    prechild.write("%s %s\n" % (i, vocab[int(i)-1]))
+
+      
+
 
 # grabbed from https://hg.python.org/cpython/file/default/Lib/argparse.py
 # written by steven bethard! super cool!
@@ -150,41 +181,21 @@ def main():
   prechild = prepfile(open(args.child+".last", 'w', encoding="utf-8"), 'w')
 
 
-  # get train source vocab, sorted lexicographically
-  vocab = dd(int)
-  for line in trainsource:
-    for tok in line.strip().split():
-      vocab[tok]+=1
-  # vocabulary sorted by frequency, most frequent first
-  vocab = list(map (lambda x: x[0], sorted(vocab.items(), key=operator.itemgetter(1), reverse=True)))
-
-  print("Vocab length %d" % len(vocab))
   # get layer info from parent model
   line = parent.readline()
   (nlayer, nhidden, ntarget, nsource) = map(int, line.strip().split()[:4])
   prechild.write(line)
-  if len(vocab) < nsource:
-    sys.stderr.write("Error: child vocabulary (%d) smaller than parent vocabulary (%d)\n" % (len(vocab), nsource))
-    sys.exit(1)
   moption = "-M "+"0 "*(nlayer-1)+"1 1"
   line = parent.readline()
   if re.match("^=+$", line) is None:
     sys.stderr.write("Error: unexpected line "+line)
     sys.exit(1)
   prechild.write(line)
-
-  # replace parent vocab with child vocab
-  line = parent.readline()
-  if re.match("^0 <UNK>$", line) is None:
-    sys.stderr.write("Error: unexpected line "+line)
-    sys.exit(1)
-  prechild.write(line)
-  for line in parent:
-    if re.match("^=+$", line) is not None:
-      prechild.write(line)
-      break
-    i, _ = line.strip().split()
-    prechild.write("%s %s\n" % (i, vocab[int(i)-1]))
+  # always do source replace
+  replacevocab(parent, prechild, nsource, trainsource, 1)
+  # if you're going to retrain the target side, you should replace the vocabulary
+  if args.train_target_input_embedding or args.train_target_output_embedding:
+    replacevocab(parent, prechild, ntarget, traintarget, 3)
   # replace rest of parent model
   for line in parent:
     prechild.write(line)

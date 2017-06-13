@@ -48,7 +48,7 @@ def addonoffarg(parser, arg, dest=None, default=True, help="TODO"):
   group = parser.add_mutually_exclusive_group()
   dest = arg if dest is None else dest
   group.add_argument('--%s' % arg, dest=dest, action='store_true', default=default, help=help)
-  group.add_argument('--no-%s' % arg, dest=dest, action='store_false', default=default, help="See --%s" % arg)
+  group.add_argument('--no-%s' % arg, dest=dest, action='store_false', default=not default, help="See --%s" % arg)
 
 def main():
   parser = argparse.ArgumentParser(description="hpc launch to rescore n-best lists with a given model",
@@ -62,10 +62,12 @@ def main():
   parser.add_argument("--label", "-l", type=str, default="x", help="label for job names")
   parser.add_argument("--eval", "-e", nargs='+', type=str, default=["dev", "test", "syscomb"], help="sets to evaluate on")
   parser.add_argument("--root", "-r", help="path to put outputs")
+  parser.add_argument("--suffix", "-S", help="goes on the end of final onebest", default="onebest.rerank")
   parser.add_argument("--rescore_single", default=os.path.join(scriptdir, "rescore_single.sh"), help="rescore script")
   parser.add_argument("--convert", default=os.path.join(scriptdir, "nmtrescore2sbmtnbest.py"), help="adjoin scores")
   parser.add_argument("--pipeline", default='/home/nlg-02/pust/pipeline-2.22', help="sbmt pipeline")
   parser.add_argument("--runrerank", default='runrerank.sh', help="runrerank script")
+  addonoffarg(parser, 'skipnmt', help="assume nmt results already exist and skip them", default=False)
 
   workdir = tempfile.mkdtemp(prefix=os.path.basename(__file__), dir=os.getenv('TMPDIR', '/tmp'))
 
@@ -98,20 +100,26 @@ def main():
       target = os.path.realpath(os.path.join(args.input, "{}.trg".format(dataset)))
       scores = os.path.realpath(os.path.join(args.root, "{}.m{}.scores".format(dataset, model)))
       allscores.append(scores)
-      log = os.path.realpath(os.path.join(args.root, "{}.m{}.log".format(dataset, model)))
-      cmd = "qsubrun -j oe -o {root}/{dataset}.m{model}.monitor -N {label}.{dataset}.{model} -- {rescore} --model {modelroot} --model_num {model} --source {source} --target {target} --scores {scores} --extra_rnn_args \"__logfile {log}\"".format(root=args.root, dataset=dataset, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), source=source, target=target, scores=scores, log=log, label=args.label)
-      outfile.write(cmd+"\n")
-      job = check_output(shlex.split(cmd)).decode('utf-8').strip()
-      JOBS.add(job)
-      jobids.append(job)
+      if args.skipnmt:
+        if not os.path.exists(scores):
+          sys.stderr.write("ERROR: Skipping nmt but {} does not exist\n".format(scores))
+          sys.exit(1)
+      else:
+        log = os.path.realpath(os.path.join(args.root, "{}.m{}.log".format(dataset, model)))
+        cmd = "qsubrun -j oe -o {root}/{dataset}.m{model}.monitor -N {label}.{dataset}.{model} -- {rescore} --model {modelroot} --model_num {model} --source {source} --target {target} --scores {scores} --extra_rnn_args \"__logfile {log}\"".format(root=args.root, dataset=dataset, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), source=source, target=target, scores=scores, log=log, label=args.label)
+        outfile.write(cmd+"\n")
+        job = check_output(shlex.split(cmd)).decode('utf-8').strip()
+        JOBS.add(job)
+        jobids.append(job)
       
-    # combine rescores and paste in previous nbests; 
-    jobidstr = ':'.join(jobids)
+    # combine rescores and paste in previous nbests;
+
+    jobidstr = "-W depend=afterok:"+':'.join(jobids) if len(jobids)>=1 else ""
     scorestr = ' '.join(allscores)
     nbest = os.path.join(args.input, "{}.nbest".format(dataset))
-    adjoin = os.path.join(args.root, "{}.adjoin".format(dataset))
+    adjoin = os.path.join(args.root, "{}.adjoin.{}".format(dataset, args.suffix))
     adjoins[dataset] = adjoin
-    cmd = "qsubrun -j oe -o {root}/{dataset}.convert.monitor -N {label}.{dataset}.convert -W depend=afterok:{jobidstr} -- {convert} -i {scorestr} -a {nbest} -o {adjoin}".format(root=args.root, dataset=dataset, jobidstr=jobidstr, convert=args.convert, scorestr=scorestr, nbest=nbest, adjoin=adjoin, label=args.label)
+    cmd = "qsubrun -j oe -o {root}/{dataset}.convert.monitor -N {label}.{dataset}.convert {jobidstr} -- {convert} -i {scorestr} -a {nbest} -o {adjoin}".format(root=args.root, dataset=dataset, jobidstr=jobidstr, convert=args.convert, scorestr=scorestr, nbest=nbest, adjoin=adjoin, label=args.label)
     outfile.write(cmd+"\n")
     job = check_output(shlex.split(cmd)).decode('utf-8').strip()
     JOBS.add(job)
@@ -122,7 +130,7 @@ def main():
   # run actual rerank
   decodestr = ' '.join([adjoins[x] for x in args.eval])
   combineidstr = ':'.join(combineids)
-  cmd="qsubrun -q isi -l walltime=0:10:00 -j oe -o {root}/rescore.monitor -N {label}.rescore -W depend=afterok:{combineidstr} -- {rerank} -f \"{featels}\" -w {weights} -r {devref} -o {root} -t {devadj} {decodestr}".format(root=args.root, combineidstr=combineidstr, rerank=os.path.join(args.pipeline, args.runrerank), featels=featels, weights=os.path.join(args.input, "weights.final"), devref=os.path.join(args.input, "{}.trg.ref".format(args.dev)), devadj=adjoins[args.dev], decodestr=decodestr, label=args.label)
+  cmd="qsubrun -q isi -l walltime=0:10:00 -j oe -o {root}/rescore.monitor -N {label}.rescore -W depend=afterok:{combineidstr} -- {rerank} -S {suffix} -f \"{featels}\" -w {weights} -r {devref} -o {root} -t {devadj} {decodestr}".format(root=args.root, combineidstr=combineidstr, suffix=args.suffix, rerank=os.path.join(args.pipeline, args.runrerank), featels=featels, weights=os.path.join(args.input, "weights.final"), devref=os.path.join(args.input, "{}.trg.ref".format(args.dev)), devadj=adjoins[args.dev], decodestr=decodestr, label=args.label)
   outfile.write(cmd+"\n")
   job = check_output(shlex.split(cmd)).decode('utf-8').strip()
   JOBS.add(job)

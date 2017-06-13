@@ -29,7 +29,14 @@ MODEL_NUMS=$8
 FINAL_DATA=""
 SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
 echo "FINAL_ARGS = $FINAL_ARGS"
-echo "ORIG_DATA = $ORIG_DATA"
+echo "ORIG = $ORIG_DATA"
+echo "OUTPUT_FILE    = $OUTPUT_FILE   "    
+echo "TTABLE	     = $TTABLE	      "
+echo "UNK_REP	     = $UNK_REP	      "
+echo "DECODE_FORMAT  = $DECODE_FORMAT "    
+echo "MODEL_NUMS     = $MODEL_NUMS    "    
+
+
 for i in $SPACED_MODEL_NUMS; do 
 	cp $ORIG_DATA  $MTMP"/src_data${i}.txt"
 	FINAL_DATA=$FINAL_DATA" src_data${i}.txt"
