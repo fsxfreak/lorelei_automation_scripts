@@ -87,12 +87,13 @@ def main():
     outfiles.append(of)
     # launch individual rescore jobs; collect job ids
     cmd="qsubrun -o {workdir}/split.log.{piece} -N split.{piece} {qsub} -- {rescore_single} -m {model} -n {modelnum} -d {df} -o {of} -l {workdir}/inner.log.{piece}".format(qsub=qsubopts, workdir=workdir, piece=piece, rescore_single=args.rescore_single, model=args.model, modelnum=args.modelnum, df=df, of=of)
-    print("Launching {}".format(cmd))
+    #print("Launching {}".format(cmd))
     jobid = run(shlex.split(cmd), stdout=PIPE).stdout.decode('utf-8').strip()
-    print("Got {}".format(jobid))
+    #print("Got {}".format(jobid))
     jobids.append(jobid)
   joincmd += "{} -- {} -i {} -o {} ".format(':'.join(jobids), args.cat, ' '.join(outfiles), args.outfile)
-  print(joincmd)
-  run(shlex.split(joincmd))
+  #print(joincmd)
+  res = run(shlex.split(joincmd), stdout=PIPE).stdout.decode('utf-8').strip()
+  print(res)
 if __name__ == '__main__':
   main()

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 #This script was written by barret zoph for questions email barretzoph@gmail.com
+set -e
 
 #Set Script Name variable
 SCRIPT=`basename ${BASH_SOURCE[0]}`
@@ -127,6 +128,8 @@ while [[ $VAR -le $NUM ]]; do
     shift 1
 done
 
+echo "done with arguments"
+
 SPACED_MODEL_NUMS=`echo $MODEL_NUMS| sed 's/_/ /g'`;
 
 #run some input checks
@@ -178,6 +181,7 @@ check_parent_structure () {
 
 check_dir_final_char () {
     FINAL_CHAR="${1: -1}"
+    echo $FINAL_CHAR;
     if [[ $FINAL_CHAR != "/" ]]; then
         return 1
     fi
@@ -216,51 +220,53 @@ if [[ $KBEST_SIZE != 1 ]]; then
     exit 1  
 fi
 
-
-check_zero_file "$INPUT_FILE"
+echo "running real things"
+#check_zero_file "$INPUT_FILE"
 check_valid_num "$KBEST_SIZE"
+echo "checked valid num";
 BEAM_SIZE=$(( 12 > $KBEST_SIZE ? 12 : $KBEST_SIZE ))
-check_dir_final_char "$TRAINED_MODELS_PATH"
-BOOL_COND=$?
-if [[ "$BOOL_COND" == 1 ]]; then
-    TRAINED_MODELS_PATH=$TRAINED_MODELS_PATH"/"
-fi
-check_parent_structure "$TRAINED_MODELS_PATH"
+echo $BEAM_SIZE;
+#check_parent_structure "$TRAINED_MODELS_PATH"
 LONGEST_SENT=$( wc -L $INPUT_FILE | cut -f1 -d' ' )
 check_valid_file_path "$OUTPUT_FILE"
 check_valid_file_path "$LOG_FILE"
-check_relative_path "$INPUT_FILE"
-check_relative_path "$TRAINED_MODELS_PATH"
-check_relative_path "$OUTPUT_FILE"
-check_relative_path "$LOG_FILE"
-check_berk_aligner "$TRAINED_MODELS_PATH"
+echo "checked valid file paths";
+# readlink replaces checking relative path: turn relative into absolute!
+# using parameter indirection: ${!c} = $x if c=x
+for i in INPUT_FILE TRAINED_MODELS_PATH OUTPUT_FILE LOG_FILE; do
+    declare $i=$(readlink -f ${!i});
+done
+echo "did readlinking"
+
+#check_berk_aligner "$TRAINED_MODELS_PATH"
 
 #paths
 BLEU_FORMAT="${DIR}helper_programs/bleu_format.py"
 UNK_REP="${DIR}helper_programs/att_unk_rep.py"
 DECODE_FORMAT="${DIR}helper_programs/decode_format.py"
-TTABLE="${TRAINED_MODELS_PATH}berk_aligner/aligner_output/stage2.2.params.txt"
+TTABLE="${TRAINED_MODELS_PATH}/berk_aligner/aligner_output/stage2.2.params.txt"
 MODEL_NAMES=""
 
 MFLAGS="-M";
 nextgpu=0
 for i in $SPACED_MODEL_NUMS; do    
-    CURR_MODEL_NAME="${TRAINED_MODELS_PATH}model${i}/best.nn"
-    check_zero_file $CURR_MODEL_NAME;
+    CURR_MODEL_NAME="${TRAINED_MODELS_PATH}/model${i}/best.nn"
+    #check_zero_file $CURR_MODEL_NAME;
     MODEL_NAMES=$MODEL_NAMES" $CURR_MODEL_NAME";
     MFLAGS="$MFLAGS $nextgpu";
     nextgpu=$(((nextgpu+1)%2)) # flip between 0 and 1
     #HACKY FIX FOR OLD CODE
-    TEMP_FIRST=$( head -1 $CURR_MODEL_NAME )
-    TEMP_ARR=($TEMP_FIRST)
-    if [[ ${#TEMP_ARR[@]} < 5 ]]; then
-        TEMP_FIRST=$TEMP_FIRST" 1 1 0 0 0"
-        sed -i "1s/.*/$TEMP_FIRST/" $CURR_MODEL_NAME 
-    fi
+    # TEMP_FIRST=$( head -1 $CURR_MODEL_NAME )
+    # TEMP_ARR=($TEMP_FIRST)
+    # if [[ ${#TEMP_ARR[@]} < 5 ]]; then
+    #     TEMP_FIRST=$TEMP_FIRST" 1 1 0 0 0"
+    #     sed -i "1s/.*/$TEMP_FIRST/" $CURR_MODEL_NAME 
+    # fi
 done
 EXTRA_RNN_ARGS=`echo $EXTRA_RNN_ARGS | sed 's/__/--/g'`;
 FINAL_ARGS="\" $RNN_LOCATION --logfile $LOG_FILE -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT $EXTRA_RNN_ARGS \""
 DECODE_SCRIPT="${DIR}helper_programs/decode_single.sh"
+echo "about to submit";
 if [[ $NOQSUB == 0 ]]; then
     SMART_QSUB="${DIR}helper_programs/qsubrun"
     QSUBOPTS=`echo $QSUBOPTS | sed 's/_/-/g'`;

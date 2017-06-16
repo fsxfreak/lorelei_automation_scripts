@@ -54,7 +54,7 @@ def main():
   parser = argparse.ArgumentParser(description="hpc launch to rescore n-best lists with a given model",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   addonoffarg(parser, 'debug', help="debug mode", default=False)
-  parser.add_argument("--input", "-i", help="input directory containing *.src, *.trg, *.trg.ref, weights.final for each set for a language")
+  parser.add_argument("--input", "-i", help="input directory containing *.src.hyp, *.trg.ref, weights.final for each set for a language")
   parser.add_argument("--outfile", "-o", nargs='?', type=argparse.FileType('w'), default=sys.stdout, help="output file")
   parser.add_argument("--model", "-m", help="path to zoph trained model")
   parser.add_argument("--model_nums", "-n", nargs='+', type=int, default=[1,2,3,4,5,6,7,8], help="which models to use")
@@ -62,8 +62,9 @@ def main():
   parser.add_argument("--label", "-l", type=str, default="x", help="label for job names")
   parser.add_argument("--eval", "-e", nargs='+', type=str, default=["dev", "test", "syscomb"], help="sets to evaluate on")
   parser.add_argument("--root", "-r", help="path to put outputs")
+  parser.add_argument("--width", "-w", type=int, default=5, help="how many pieces to split each rescore job")
   parser.add_argument("--suffix", "-S", help="goes on the end of final onebest", default="onebest.rerank")
-  parser.add_argument("--rescore_single", default=os.path.join(scriptdir, "rescore_single.sh"), help="rescore script")
+  parser.add_argument("--rescore_single", default=os.path.join(scriptdir, "rescore_split.py"), help="rescore script")
   parser.add_argument("--convert", default=os.path.join(scriptdir, "nmtrescore2sbmtnbest.py"), help="adjoin scores")
   parser.add_argument("--pipeline", default='/home/nlg-02/pust/pipeline-2.22', help="sbmt pipeline")
   parser.add_argument("--runrerank", default='runrerank.sh', help="runrerank script")
@@ -96,8 +97,7 @@ def main():
     allscores = []
     # rescore submissions; catch jobids
     for model in args.model_nums:
-      source = os.path.realpath(os.path.join(args.input, "{}.src".format(dataset)))
-      target = os.path.realpath(os.path.join(args.input, "{}.trg".format(dataset)))
+      data = os.path.realpath(os.path.join(args.input, "{}.src.hyp".format(dataset)))
       scores = os.path.realpath(os.path.join(args.root, "{}.m{}.scores".format(dataset, model)))
       allscores.append(scores)
       if args.skipnmt:
@@ -106,7 +106,8 @@ def main():
           sys.exit(1)
       else:
         log = os.path.realpath(os.path.join(args.root, "{}.m{}.log".format(dataset, model)))
-        cmd = "qsubrun -j oe -o {root}/{dataset}.m{model}.monitor -N {label}.{dataset}.{model} -- {rescore} --model {modelroot} --model_num {model} --source {source} --target {target} --scores {scores} --extra_rnn_args \"__logfile {log}\"".format(root=args.root, dataset=dataset, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), source=source, target=target, scores=scores, log=log, label=args.label)
+        cmd = "{rescore} --workdir {root}/{dataset} --splitsize {width} --model {modelroot} --modelnum {model} --datafile {data} --outfile {scores} --logfile {log}".format(model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), data=data, root=args.root, dataset=dataset, scores=scores, width=args.width, log=log)
+#        cmd = "qsubrun -j oe -o {root}/{dataset}.m{model}.monitor -N {label}.{dataset}.{model} -- {rescore} --model {modelroot} --modelnum {model} --datafile {data} --target {target} --scores {scores} --extra_rnn_args \"__logfile {log}\"".format(root=args.root, dataset=dataset, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), source=source, target=target, scores=scores, log=log, label=args.label)
         outfile.write(cmd+"\n")
         job = check_output(shlex.split(cmd)).decode('utf-8').strip()
         JOBS.add(job)

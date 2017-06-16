@@ -29,6 +29,8 @@ writer = codecs.getwriter('utf8')
 
 
 def prepfile(fh, code):
+  if type(fh) is str:
+    fh = open(fh, code)
   ret = gzip.open(fh.name, code) if fh.name.endswith(".gz") else fh
   if sys.version_info[0] == 2:
     if code.startswith('r'):
@@ -133,13 +135,14 @@ class py34FileType(object):
 def main():
   parser = argparse.ArgumentParser(description="python port of yuret/zoph code. train a model initialized with a parent model's params",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument("--parent", "-p", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="parent model file")
+  parser.add_argument("--parent", "-p", required=True, help="parent model directory")
   parser.add_argument("--trainsource", "-ts", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="train source file")
   parser.add_argument("--traintarget", "-tt", nargs='?', type=py34FileType('r', encoding="utf-8"), default=sys.stdin, help="train target file")
   parser.add_argument("--devsource", "-ds", help="dev source file")
   parser.add_argument("--devtarget", "-dt", help="dev target file")
   parser.add_argument("--rnnbinary", default=os.path.join(scriptdir, 'ZOPH_RNN'), help="zoph rnn nmt binary")
-  parser.add_argument("--child", "-c",  help="output child model file")
+  parser.add_argument("--child", "-c", required=True, help="output child model directory")
+  parser.add_argument("--modelname", default="best.nn",  help="what we expect the model files to be called")
   parser.add_argument("--dropout", "-d", type=float, default=0.5, help="dropout rate (1 = always keep)")
   parser.add_argument("--learning_rate", "-l", type=float, default=0.5, help="learning rate")
   parser.add_argument("--adaptive_decrease_factor", "-A", type=float, default=0.9, help="adaptive decrease factor")
@@ -175,10 +178,15 @@ def main():
   except IOError as msg:
     parser.error(str(msg))
 
-  parent = prepfile(args.parent, 'r')
+  # move the parent into child location
+  parentname = os.path.join(args.child, 'parent.nn')
+  shutil.copy(os.path.join(args.parent, args.modelname), parentname)
+
+  childname = os.path.join(args.child, args.modelname)
+  parent = prepfile(parentname, 'r')
   trainsource = prepfile(args.trainsource, 'r')
   traintarget = prepfile(args.traintarget, 'r')
-  prechild = prepfile(open(args.child+".last", 'w', encoding="utf-8"), 'w')
+  prechild = prepfile(open(childname+".last", 'w', encoding="utf-8"), 'w')
 
 
   # get layer info from parent model
@@ -203,7 +211,7 @@ def main():
   parent.close()
   # launch training
 
-  maincmd = "%s -C %s %s %s -B %s -a %s %s %s" % (args.rnnbinary, args.trainsource.name, args.traintarget.name, prechild.name, args.child, args.devsource, args.devtarget, moption)
+  maincmd = "%s -C %s %s %s -B %s -a %s %s %s" % (args.rnnbinary, args.trainsource.name, args.traintarget.name, prechild.name, childname, args.devsource, args.devtarget, moption)
   cmdargs = [
     ("dropout",                        [args.dropout]),				  
     ("learning-rate",		   [args.learning_rate]),				  

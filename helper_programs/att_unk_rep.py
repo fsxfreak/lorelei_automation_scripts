@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #Run this with the output of the neural MT program
 import sys
 import codecs

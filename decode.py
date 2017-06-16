@@ -13,6 +13,7 @@ if sys.version_info[0] == 2:
 else:
   izip = zip
 from collections import defaultdict as dd
+from itertools import cycle
 import re
 import os.path
 import os
@@ -60,6 +61,29 @@ def getgpucount(default=1):
   #print("Got {} for getgpucount".format(ret))
   return ret
 
+MODELSEQ = [1,5,2,6,3,7,4,8]
+
+def get_model_config(args):
+  ''' get multi gpu options and model sequence '''
+  mflags="-M"
+  modseq=""
+  gpus = cycle(range(getgpucount()))
+  for model in MODELSEQ:
+    if model in args.modelnum:
+      mflags+=" {}".format(gpus.next())
+      modseq+=" {}".format(os.path.join(args.model, "model{}".format(model), "best.nn"))
+  return (mflags, modseq)
+      
+def prepare_data(args, workdir):
+  ''' copy source data for models and make proper argument '''
+  fseq = ""
+  for model in args.modelnum:
+    fname=os.path.join(workdir, "src.{}.txt".format(model))
+    shutil.copy(args.input, fname)
+    fseq+= " {}".format(fname)
+  return(fseq)
+  
+
 def getlongest(*files):
   ''' get length in words of the longest file '''
   max = 0
@@ -74,23 +98,27 @@ def main():
   parser = argparse.ArgumentParser(description="run rescoring/force decoding; take advantage of multi gpu",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   addonoffarg(parser, 'debug', help="debug mode", default=False)
-  parser.add_argument("--datafile", "-d", type=str, required=True, help="input datafile")
+  parser.add_argument("--input", "-i", type=str, required=True, help="input datafile")
   parser.add_argument("--model", "-m", required=True, help="model file")
-  parser.add_argument("--modelnum", "-n", required=True, help="model number")
+  parser.add_argument("--modelnum", "-n", nargs='+', type=int, default=[x for x in range(1,9)], help="model numbers")
   parser.add_argument("--logfile", "-l", type=str, default=None, help="where to log data")
-  parser.add_argument("--outfile", "-o", nargs='?', type=argparse.FileType('w'), default=sys.stdout, help="output scores file")
+  parser.add_argument("--outfile", "-o", type=str, required=True, help="output scores file")
   parser.add_argument("--extra_rnn_args", help="extra arguments to rnn binary")
   parser.add_argument("--rnn_location", default=os.path.join(scriptdir, 'helper_programs', 'ZOPH_RNN'), help="rnn binary")
 
 
+  parser.add_argument("--bleu_format", default=os.path.join(scriptdir, 'helper_programs', "bleu_format.py"  ))
+  parser.add_argument("--att_unk_rep", default=os.path.join(scriptdir, 'helper_programs', "att_unk_rep.py"  ))
+  parser.add_argument("--decode_format", default=os.path.join(scriptdir, 'helper_programs', "decode_format.py"))
+  parser.add_argument("--ttable", default=os.path.join(model, "berk_aligner","aligner_output","stage2.2.params.txt"))
 
   try:
     args = parser.parse_args()
   except IOError as msg:
     parser.error(str(msg))
-  go(args)
 
-def go(args):
+
+
   workdir = tempfile.mkdtemp(prefix=os.path.basename(__file__), dir=os.getenv('TMPDIR', '/tmp'))
   def cleanwork():
     shutil.rmtree(workdir, ignore_errors=True)
@@ -99,45 +127,27 @@ def go(args):
   else:
     atexit.register(cleanwork)
 
-  outfile = prepfile(args.outfile, 'w')
- # figure out how many gpus there are
-  # split data accordingly
-  # for each split,
-  #   set gpu
-  #   launch job
- 
-  gpus=getgpucount(default=2)
-  splitcmd = run(shlex.split("split -a 1 -n l/{gpus} -d {name} {workdir}/data.".format(gpus=gpus, name=args.datafile, workdir=workdir)), check=True)
-  procs = []
-  for gpu in range(gpus):
-    sf = prepfile("{}/source.{}".format(workdir, gpu), 'w')
-    tf = prepfile("{}/target.{}".format(workdir, gpu), 'w')
-    
-    run(shlex.split("cut -f 1 {}/data.{}".format(workdir, gpu)), stdout=sf)
-    run(shlex.split("cut -f 2 {}/data.{}".format(workdir, gpu)), stdout=tf)
-    sf.close()
-    tf.close()
-    sf = sf.name
-    tf = tf.name
-    subworkdir = tempfile.mkdtemp(prefix="gpu", dir=workdir)
-    #print(sf, tf)
-    longest = getlongest(sf, tf)
-    env = os.environ.copy()
-    env['CUDA_VISIBLE_DEVICES']="{}".format(gpu)
-    output = "{}/output".format(subworkdir)
-    #print(output)
-    if args.logfile is not None:
-      logfile = "--logfile {}.{}".format(args.logfile, gpu)
-    else:
-      logfile = ""
-    cmd = "{bin} -f {src} {trg} {model}/model{mnum}/best.nn {output} -L {longest} -m 1 {logfile} --tmp-dir-location {subwork}".format(bin=args.rnn_location, src=sf, trg=tf, model=args.model, mnum=args.modelnum, output=output, longest=longest, logfile=logfile, gpu=gpu, subwork=subworkdir)
-    #print("Running {}".format(cmd))
-    procs.append((cmd, Popen(shlex.split(cmd), env=env), output))
-  for cmd, proc, output in procs:
-    #print("Waiting for {}".format(cmd))
-    proc.wait()
-    #print("Done with {}".format(cmd))
-    for line in prepfile(output, 'r'):
-      outfile.write(line)
+  longest = getlongest(args.input)
+  fseq = prepare_data(args, workdir)
+  # FINAL_ARGS="\" $RNN_LOCATION --logfile $LOG_FILE -k $KBEST_SIZE $MODEL_NAMES $OUTPUT_FILE -b $BEAM_SIZE --print-score 1 $MFLAGS -L $LONGEST_SENT $EXTRA_RNN_ARGS \""
+  mflags, modseq = get_model_config(args)
+  unks = os.path.join(workdir, 'unks.txt')
+  outtmp = os.path.join(workdir, 'outtmp.txt')
+  cmd = "{zophrnn} --logfile {logfile} -k {kbest} {modseq} {outfile} -b {beam} --print-score 1 {mflags} -L {longest} {extraargs} --decode-main-data-files {fseq} --UNK-decode {unks} --tmp-dir-location {workdir}".format(zophrnn=args.rnn_location, logfile=args.logfile, kbest=1, modseq=modseq, outfile=args.outfile, beam=12, mflags=mflags, longest=longest, extraargs=args.extra_rnn_args, fseq=fseq, unks=unks, workdir=workdir)
+  sys.stderr.write(cmd+"\n")
+  run(shlex.split(cmd), check=True)
+  # set up temporary copies of files
+  shutil.copy(args.outfile, outtmp)
+  cmd="{bleuformat} {outfile}".format(args.bleu_format, args.outfile)
+  sys.stderr.write(cmd+"\n")
+  run(shlex.split(cmd), check=True)
+  cmd="{unkrep} {input} {outfile} {ttable} {unks}".format(unkrep=args.att_unk_rep, input=args.input, outfile=args.outfile, ttable=args.ttable, unks=unks)
+  sys.stderr.write(cmd+"\n")
+  run(shlex.split(cmd), check=True)
+  cmd="{decfmt} {outfile} {outtmp}".format(decfmt=args.decode_format, outfile=args.outfile, outtmp=outtmp)
+  sys.stderr.write(cmd+"\n")
+  run(shlex.split(cmd), check=True)
+
+
 if __name__ == '__main__':
   main()
