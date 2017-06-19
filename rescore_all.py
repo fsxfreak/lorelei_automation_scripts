@@ -29,6 +29,33 @@ def cleanjobs():
       sys.stderr.write("Couldn't delete {}\n".format(job))
 atexit.register(cleanjobs)
 
+
+def _rerankmodel(adjoins, combineids, rerankweights, outfile, args):
+  ''' run rerank model: gets weights for reranking '''
+  # figure out what feature list is actually going to be (easier to just make it than catch output of combineid)
+  featels = ' '.join(["nmt_{}".format(x) for x in range(len(args.model_nums))])
+  # run actual rerank
+  decodestr = ' '.join([adjoins[x] for x in args.eval])
+  combineidstr = ':'.join(combineids)
+  tunererank="{}/{}.{}".format(args.root, os.path.basename(adjoins[args.dev]), args.suffix)
+
+  oldfeats="text-length derivation-size lm1 lm2"
+  cmd="qsubrun -j oe -o {root}/rerankmodel.monitor -N {label}.rerankmodel -W depend=afterok:{combineidstr} -- {rerankmodel} -f {oldfeats} {featels} -w {weights} -r {devref} -o {rerankweights} -i {devadj} -b {tunererank}".format(root=args.root, combineidstr=combineidstr, rerankmodel=os.path.join(args.pipeline, args.rerankmodel), oldfeats=oldfeats, featels=featels, weights=os.path.join(args.input, "weights.final"), devref=os.path.join(args.input, "{}.trg.ref".format(args.dev)), devadj=adjoins[args.dev], label=args.label, rerankweights=rerankweights)
+  outfile.write(cmd+"\n")
+  job = check_output(shlex.split(cmd)).decode('utf-8').strip()
+  JOBS.add(job)
+  outfile.write(job+"\n")
+  return job
+
+def _applyrerank(corpus, idstr, rerankweights, outfile, args):
+  ''' apply rerank model'''
+  cmd="qsubrun -j oe -o {root}/rerank.{corpus}.monitor -N {corpus}.{label}.rerank -W depend=afterok:{idstr} -- {applymodel} -i {corpus} -w {tuneweights} -k {rerankweights} -b {outfile}".format(root=args.root, idstr=idstr, applymodel=os.path.join(args.pipeline, args.rerankapply),  tuneweights=os.path.join(args.input, "weights.final"), rerankweights=rerankweights, outfile=outfile, corpus=corpus, label=args.label)
+  outfile.write(cmd+"\n")
+  job = check_output(shlex.split(cmd)).decode('utf-8').strip()
+  JOBS.add(job)
+  outfile.write(job+"\n")
+  return job
+
 def prepfile(fh, code):
   if type(fh) is str:
     fh = open(fh, code)
@@ -59,15 +86,20 @@ def main():
   parser.add_argument("--model", "-m", help="path to zoph trained model")
   parser.add_argument("--model_nums", "-n", nargs='+', type=int, default=[1,2,3,4,5,6,7,8], help="which models to use")
   parser.add_argument("--dev", "-d", type=str, default="dev", help="set to optimize on")
+  parser.add_argument("--lang", "-L", required=True, help="language of the training")
   parser.add_argument("--label", "-l", type=str, default="x", help="label for job names")
   parser.add_argument("--eval", "-e", nargs='+', type=str, default=["dev", "test", "syscomb"], help="sets to evaluate on")
   parser.add_argument("--root", "-r", help="path to put outputs")
+  parser.add_argument("--qsubopts", default=None, help="additional options to pass to qsub")
   parser.add_argument("--width", "-w", type=int, default=5, help="how many pieces to split each rescore job")
   parser.add_argument("--suffix", "-S", help="goes on the end of final onebest", default="onebest.rerank")
   parser.add_argument("--rescore_single", default=os.path.join(scriptdir, "rescore_split.py"), help="rescore script")
   parser.add_argument("--convert", default=os.path.join(scriptdir, "nmtrescore2sbmtnbest.py"), help="adjoin scores")
   parser.add_argument("--pipeline", default='/home/nlg-02/pust/pipeline-2.22', help="sbmt pipeline")
   parser.add_argument("--runrerank", default='runrerank.sh', help="runrerank script")
+  parser.add_argument("--rerankmodel", default=os.path.join('scripts', 'runrerank.py'), help="inner runrerank model script")
+  parser.add_argument("--rerankapply", default=os.path.join('scripts', 'applyrerank.py'), help="inner runrerank apply script")
+  parser.add_argument("--packagecmd", default=os.path.join(scriptdir, 'packagenmt.sh'), help="package script")
   addonoffarg(parser, 'skipnmt', help="assume nmt results already exist and skip them", default=False)
 
   workdir = tempfile.mkdtemp(prefix=os.path.basename(__file__), dir=os.getenv('TMPDIR', '/tmp'))
@@ -91,6 +123,9 @@ def main():
 
   combineids = []
   adjoins = {}
+  qsub = ""
+  if args.qsubopts is not None:
+    qsub = "--extra_qsub_opts={}".format(args.qsubopts)
   global JOBS
   for dataset in datasets:
     jobids = []
@@ -106,8 +141,7 @@ def main():
           sys.exit(1)
       else:
         log = os.path.realpath(os.path.join(args.root, "{}.m{}.log".format(dataset, model)))
-        cmd = "{rescore} --workdir {root}/{dataset} --splitsize {width} --model {modelroot} --modelnum {model} --datafile {data} --outfile {scores} --logfile {log}".format(model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), data=data, root=args.root, dataset=dataset, scores=scores, width=args.width, log=log)
-#        cmd = "qsubrun -j oe -o {root}/{dataset}.m{model}.monitor -N {label}.{dataset}.{model} -- {rescore} --model {modelroot} --modelnum {model} --datafile {data} --target {target} --scores {scores} --extra_rnn_args \"__logfile {log}\"".format(root=args.root, dataset=dataset, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), source=source, target=target, scores=scores, log=log, label=args.label)
+        cmd = "{rescore} {qsub} --workdir {root}/{dataset} --splitsize {width} --model {modelroot} --modelnum {model} --datafile {data} --outfile {scores} --logfile {log}".format(qsub=qsub, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), data=data, root=args.root, dataset=dataset, scores=scores, width=args.width, log=log)
         outfile.write(cmd+"\n")
         job = check_output(shlex.split(cmd)).decode('utf-8').strip()
         JOBS.add(job)
@@ -128,6 +162,7 @@ def main():
 
   # figure out what feature list is actually going to be (easier to just make it than catch output of combineid)
   featels = ' '.join(["nmt_{}".format(x) for x in range(len(args.model_nums))])
+  rerankweights="{}/rerank.weights".format(args.root)
   # run actual rerank
   decodestr = ' '.join([adjoins[x] for x in args.eval])
   combineidstr = ':'.join(combineids)
@@ -136,6 +171,16 @@ def main():
   job = check_output(shlex.split(cmd)).decode('utf-8').strip()
   JOBS.add(job)
   outfile.write(job+"\n")
+  rescoreid="-W depend=afterok:{}".format(job)
+  for dataset in datasets:
+    orig=os.path.join(args.input, "{}.src.orig".format(dataset))
+    tstmaster = os.path.join(args.input, "*.{}.*.xml.gz".format(dataset))
+    cmd= "qsubrun -N {dataset}.{label}.rescore.package -j oe -o {root}/{dataset}.package.monitor {rescoreid} -- {package} {root}/{dataset}.adjoin.{suff}.{suff} {orig} {tstmaster} {root}/{label}-rescore.{lang}-eng.{dataset}.y1r1.v2.xml.gz".format(root=args.root, package=args.packagecmd, suff=args.suffix,  name=args.name, dataset=dataset, orig=orig, tstmaster=tstmaster, child=args.child, label=args.label, lang=args.lang, rescoreid=rescoreid )
+    outfile.write(cmd+"\n")
+    job = check_output(shlex.split(cmd)).decode('utf-8').strip()
+    JOBS.add(job)
+    outfile.write(job+"\n")
+
   # (TODO: run bleu)
 
   # no more atexit job deletion

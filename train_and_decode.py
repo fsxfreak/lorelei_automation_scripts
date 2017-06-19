@@ -26,14 +26,27 @@ reader = codecs.getreader('utf8')
 writer = codecs.getwriter('utf8')
 
 
-def _standalone(args):
+def _parent(args):
   # train
-  cmd = "{train} --name {name} --mode standalone --trained_model {stand} --model_nums {nums} -ts {data}/{tr_src} -tt {data}/{tr_trg} -ds {data}/{dv_src} -dt {data}/{dv_trg} -e {epochs}".format(train=args.traincmd, name=args.name, stand=args.standalone, nums=' '.join(args.model_nums), data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, epochs=args.epochs)
+  cmd = "{train} --name {name} --mode parent --trained_model {par} --model_nums {nums} -ts {pardata}/{par_src} -tt {pardata}/{par_trg} -ds {pardata}/{pardv_src} -dt {pardata}/{pardv_trg} -ms {data}/{tr_src} -mt {data}/{tr_trg} -e {parepochs}".format(train=args.traincmd, name=args.name, par=args.parent, nums=' '.join(args.model_nums), pardata=args.parent_data, data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, par_src=args.parent_source, par_trg=args.parent_target, pardv_src=args.parent_dev_source, pardv_trg=args.parent_dev_target, parepochs=args.parentepochs)
   sys.stderr.write(cmd+"\n")
   trainid = ""
-  if args.do_standalone_train:
+  trainid=run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
+  return trainid
+
+def _child(args, trainid):
+  # train
+  if trainid is not None and len(trainid) > 0:
+    qsub = "--qsubopts=\"-W depend=afterok:{}\"".format(trainid)
+  else:
+    qsub=""
+
+  cmd = "{train} --name {name} --mode child --parent_model {par} --trained_model {child} --no-align --previous_alignment {stand}/berk_aligner {qsub} --model_nums {nums} -ts {data}/{tr_src} -tt {data}/{tr_trg} -ds {data}/{dv_src} -dt {data}/{dv_trg} -e {epochs}".format(train=args.traincmd, name=args.name, par=args.parent, child=args.child, stand=args.standalone, qsub=qsub, nums=' '.join(args.model_nums), data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, epochs=args.epochs)
+  sys.stderr.write(cmd+"\n")
+  trainid = ""
+  if args.do_child_train:
     trainid=run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
-    trainid = "_W depend=afterok:{}".format(trainid)
+    trainid = "-W depend=afterok:{}".format(trainid)
 
 
   for decset in args.decodes:
@@ -42,8 +55,38 @@ def _standalone(args):
     input = os.path.join(args.data, "{}.src".format(decset))
     orig = os.path.join(args.data, "{}.src.orig".format(decset))
     tstmaster = os.path.join(args.data, "*.{}.*.xml.gz".format(decset))
-    nums = '_'.join(args.model_nums)
-    cmd="{decode} --qsubopts \"{trainid} _N {name}.{decset}.standalone.decode _j oe _o {stand}/{decset}.monitor\" --input_file {input} --trained_models {stand} --model_nums {nums} --num_best 1 --output_file {stand}/{decset}.decode".format(decode=args.decodecmd, trainid=trainid, name=args.name, decset=decset, stand=args.standalone, input=input, nums=nums)
+    nums = ' '.join(args.model_nums)
+    cmd="qsubrun {trainid} -N {name}.{decset}.child.decode -o  {child}/{decset}.monitor -- {decode} -i {input} -m {child} -n {nums} -o {child}/{decset}.decode -l {child}/{decset}.log".format(decode=args.decodecmd, trainid=trainid, name=args.name, decset=decset, child=args.child, input=input, nums=nums)
+    sys.stderr.write(cmd+"\n")
+    decodeid = ""
+    if args.do_child_decode:
+      decodeid = run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
+      decodeid = "-W depend=afterok:{}".format(decodeid)
+
+
+    # package
+    cmd= "qsubrun -N {name}.{decset}.child.package -j oe -o {child}/{decset}.package.monitor {decodeid} -- {package} {child}/{decset}.decode {orig} {tstmaster} {child}/{name}-child.{lang}-eng.{decset}.y1r1.v2.xml.gz".format(package=args.packagecmd,  name=args.name, decset=decset, child=args.child, decodeid=decodeid, orig=orig, tstmaster=tstmaster, lang=args.lang )
+    if args.do_child_package:
+      run(shlex.split(cmd), check=True)
+
+def _standalone(args):
+  # train
+  cmd = "{train} --name {name} --mode standalone --trained_model {stand} --model_nums {nums} -ts {data}/{tr_src} -tt {data}/{tr_trg} -ds {data}/{dv_src} -dt {data}/{dv_trg} -e {epochs}".format(train=args.traincmd, name=args.name, stand=args.standalone, nums=' '.join(args.model_nums), data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, epochs=args.epochs)
+  sys.stderr.write(cmd+"\n")
+  trainid = ""
+  if args.do_standalone_train:
+    trainid_elts=run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
+    trainid = "-W depend=afterok:{}".format(trainid_elts)
+
+
+  for decset in args.decodes:
+
+    # decode
+    input = os.path.join(args.data, "{}.src".format(decset))
+    orig = os.path.join(args.data, "{}.src.orig".format(decset))
+    tstmaster = os.path.join(args.data, "*.{}.*.xml.gz".format(decset))
+    nums = ' '.join(args.model_nums)
+    cmd="qsubrun {trainid} -N {name}.{decset}.standalone.decode -o  {stand}/{decset}.monitor -- {decode} -i {input} -m {stand} -n {nums} -o {stand}/{decset}.decode -l {stand}/{decset}.log".format(decode=args.decodecmd, trainid=trainid, name=args.name, decset=decset, stand=args.standalone, input=input, nums=nums)
     sys.stderr.write(cmd+"\n")
     decodeid = ""
     if args.do_standalone_decode:
@@ -55,7 +98,7 @@ def _standalone(args):
     cmd= "qsubrun -N {name}.{decset}.standalone.package -j oe -o {stand}/{decset}.package.monitor {decodeid} -- {package} {stand}/{decset}.decode {orig} {tstmaster} {stand}/{name}-standalone.{lang}-eng.{decset}.y1r1.v2.xml.gz".format(package=args.packagecmd,  name=args.name, decset=decset, stand=args.standalone, decodeid=decodeid, orig=orig, tstmaster=tstmaster, lang=args.lang )
     if args.do_standalone_package:
       run(shlex.split(cmd), check=True)
-
+  return trainid_elts
 
 def prepfile(fh, code):
   if type(fh) is str:
@@ -108,7 +151,7 @@ def main():
   parser.add_argument("--qsubopts", default="", help="additional options to pass to qsub")
   parser.add_argument("--extra_rnn_args", default="", help="additional options to pass to rnn binary")
   parser.add_argument("--traincmd", default=os.path.join(scriptdir, 'train_models.py'), help="training script")
-  parser.add_argument("--decodecmd", default=os.path.join(scriptdir, 'decode_models.sh'), help="decode script")
+  parser.add_argument("--decodecmd", default=os.path.join(scriptdir, 'decode.py'), help="decode script")
   parser.add_argument("--packagecmd", default=os.path.join(scriptdir, 'packagenmt.sh'), help="package script")
   addonoffarg(parser, 'do_standalone', help="do standalone anything", default=True)
   addonoffarg(parser, 'do_standalone_train', help="do standalone training", default=True)
@@ -118,6 +161,7 @@ def main():
   addonoffarg(parser, 'do_child', help="do child anything", default=True)
   addonoffarg(parser, 'do_child_train', help="do child training", default=True)
   addonoffarg(parser, 'do_child_decode', help="do child decoding", default=True)
+  addonoffarg(parser, 'do_child_package', help="do child packaging", default=True)
 
 
 
@@ -138,9 +182,13 @@ def main():
   jobids = []
 
   # standalone
+  elts = []
   if args.do_standalone:
-    _standalone(args)
-  # TODO: continue on with parent and child?
+    elts.append(_standalone(args))
+  if args.do_parent:
+    elts.append(_parent(args))
+  if args.do_child:
+    _child(args, ':'.join(elts))
 
 if __name__ == '__main__':
   main()

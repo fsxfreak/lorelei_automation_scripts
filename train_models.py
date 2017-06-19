@@ -166,7 +166,7 @@ def main():
   if args.align:
     jobids.append(runaligner(args))
   elif args.mode != 'parent' and args.previous_alignment is not None:
-    dst = os.path.join(args.trained_model, 'berk_align')
+    dst = os.path.join(args.trained_model, 'berk_aligner')
     if not os.path.exists(dst):
       os.symlink(os.path.abspath(args.previous_alignment), dst)
 

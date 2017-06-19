@@ -70,7 +70,7 @@ def get_model_config(args):
   gpus = cycle(range(getgpucount()))
   for model in MODELSEQ:
     if model in args.modelnum:
-      mflags+=" {}".format(gpus.next())
+      mflags+=" {}".format(next(gpus))
       modseq+=" {}".format(os.path.join(args.model, "model{}".format(model), "best.nn"))
   return (mflags, modseq)
       
@@ -107,18 +107,20 @@ def main():
   parser.add_argument("--rnn_location", default=os.path.join(scriptdir, 'helper_programs', 'ZOPH_RNN'), help="rnn binary")
 
 
-  parser.add_argument("--bleu_format", default=os.path.join(scriptdir, 'helper_programs', "bleu_format.py"  ))
-  parser.add_argument("--att_unk_rep", default=os.path.join(scriptdir, 'helper_programs', "att_unk_rep.py"  ))
-  parser.add_argument("--decode_format", default=os.path.join(scriptdir, 'helper_programs', "decode_format.py"))
-  parser.add_argument("--ttable", default=os.path.join(model, "berk_aligner","aligner_output","stage2.2.params.txt"))
+  parser.add_argument("--bleu_format", default=os.path.join(scriptdir, 'helper_programs', "bleu_format.py"  ), help='conversion script')
+  parser.add_argument("--att_unk_rep", default=os.path.join(scriptdir, 'helper_programs', "att_unk_rep.py"  ), help='conversion script')
+  parser.add_argument("--decode_format", default=os.path.join(scriptdir, 'helper_programs', "decode_format.py"), help='conversion script')
+  parser.add_argument("--ttable", default=os.path.join("berk_aligner","aligner_output","stage2.2.params.txt"), help='ttable file; assumed to be in model directory')
 
   try:
+    args = parser.parse_args()
+
     args = parser.parse_args()
   except IOError as msg:
     parser.error(str(msg))
 
 
-
+  ttable = os.path.join(args.model, args.ttable)
   workdir = tempfile.mkdtemp(prefix=os.path.basename(__file__), dir=os.getenv('TMPDIR', '/tmp'))
   def cleanwork():
     shutil.rmtree(workdir, ignore_errors=True)
@@ -138,15 +140,19 @@ def main():
   run(shlex.split(cmd), check=True)
   # set up temporary copies of files
   shutil.copy(args.outfile, outtmp)
-  cmd="{bleuformat} {outfile}".format(args.bleu_format, args.outfile)
+#  shutil.copy(args.outfile, args.outfile+".postout")
+  cmd="{bleuformat} {outfile}".format(bleuformat=args.bleu_format, outfile=args.outfile)
   sys.stderr.write(cmd+"\n")
   run(shlex.split(cmd), check=True)
-  cmd="{unkrep} {input} {outfile} {ttable} {unks}".format(unkrep=args.att_unk_rep, input=args.input, outfile=args.outfile, ttable=args.ttable, unks=unks)
+ # shutil.copy(args.outfile, args.outfile+".postbleu")
+  cmd="{unkrep} {input} {outfile} {ttable} {unks}".format(unkrep=args.att_unk_rep, input=args.input, outfile=args.outfile, ttable=ttable, unks=unks)
   sys.stderr.write(cmd+"\n")
   run(shlex.split(cmd), check=True)
-  cmd="{decfmt} {outfile} {outtmp}".format(decfmt=args.decode_format, outfile=args.outfile, outtmp=outtmp)
-  sys.stderr.write(cmd+"\n")
-  run(shlex.split(cmd), check=True)
+ # shutil.copy(args.outfile, args.outfile+".postunk")
+  # cmd="{decfmt} {outfile} {outtmp}".format(decfmt=args.decode_format, outfile=args.outfile, outtmp=outtmp)
+  # sys.stderr.write(cmd+"\n")
+  # run(shlex.split(cmd), check=True)
+  # shutil.copy(args.outfile, args.outfile+".postfmt")
 
 
 if __name__ == '__main__':
