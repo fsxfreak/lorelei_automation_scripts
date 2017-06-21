@@ -25,15 +25,25 @@ for set in ${SETS[@]}; do
     nbest=$PUSTDIR/decode-dev-$set.final/nbest.sort
     ref=$datadir/$set.target.tok.tc
     src=$datadir/$set.source.tok.tc
+    srcorig=$datadir/$set.source.orig
+    master=$(find $datadir -maxdepth 1 -mindepth 1 -name "*.$set.*.xml.gz")
+    master=$(echo $master | cut -d' ' -f1)
+
     if [[ ! -e $nbest ]]; then
 	echo "Skipping $set; no nbest ($nbest)"
 	continue
     fi
-    if  [[ ! -e $src ]]; then
-	echo "Skipping $set; no src ($src)"
+    if [[ ! -e $master ]]; then
+	echo "Skipping $set; no master ($master)"
 	continue
     fi
+    if  [[ ! -e $src ]] || [[ ! -e $srcorig ]]; then
+	echo "Skipping $set; no src ($src) or srcorig ($srcorig)"
+	continue
+    fi
+    ln -s $srcorig $OUTDIR/$set.src.orig
     ln -s $nbest $OUTDIR/$set.nbest
+    ln -s $master $OUTDIR
     $SCRIPTDIR/nbest2rerankdata.py -i $OUTDIR/$set.nbest -s $src -o $OUTDIR/$set.src.hyp
     if [[ -e $ref ]]; then
 	ln -s $ref $OUTDIR/$set.trg.ref;

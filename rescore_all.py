@@ -30,31 +30,39 @@ def cleanjobs():
 atexit.register(cleanjobs)
 
 
-def _rerankmodel(adjoins, combineids, rerankweights, outfile, args):
+def _rerankmodel(devadj, devid, rerankweights, outfile, args):
   ''' run rerank model: gets weights for reranking '''
   # figure out what feature list is actually going to be (easier to just make it than catch output of combineid)
   featels = ' '.join(["nmt_{}".format(x) for x in range(len(args.model_nums))])
   # run actual rerank
-  decodestr = ' '.join([adjoins[x] for x in args.eval])
-  combineidstr = ':'.join(combineids)
-  tunererank="{}/{}.{}".format(args.root, os.path.basename(adjoins[args.dev]), args.suffix)
-
+  print(devadj)
+  tunererank="{}/{}.{}".format(args.root, os.path.basename(devadj), args.suffix)
+  
   oldfeats="text-length derivation-size lm1 lm2"
-  cmd="qsubrun -j oe -o {root}/rerankmodel.monitor -N {label}.rerankmodel -W depend=afterok:{combineidstr} -- {rerankmodel} -f {oldfeats} {featels} -w {weights} -r {devref} -o {rerankweights} -i {devadj} -b {tunererank}".format(root=args.root, combineidstr=combineidstr, rerankmodel=os.path.join(args.pipeline, args.rerankmodel), oldfeats=oldfeats, featels=featels, weights=os.path.join(args.input, "weights.final"), devref=os.path.join(args.input, "{}.trg.ref".format(args.dev)), devadj=adjoins[args.dev], label=args.label, rerankweights=rerankweights)
+  cmd="qsubrun -j oe -o {root}/rerankmodel.monitor -N {label}.rerankmodel -W depend=afterok:{devid} -- {rerankmodel} -f {oldfeats} {featels} -w {weights} -r {devref} -o {rerankweights} -i {devadj} -b {tunererank}".format(tunererank=tunererank, root=args.root, devid=devid, rerankmodel=os.path.join(args.pipeline, args.rerankmodel), oldfeats=oldfeats, featels=featels, weights=os.path.join(args.input, "weights.final"), devref=os.path.join(args.input, "{}.trg.ref".format(args.dev)), devadj=devadj, label=args.label, rerankweights=rerankweights)
   outfile.write(cmd+"\n")
   job = check_output(shlex.split(cmd)).decode('utf-8').strip()
   JOBS.add(job)
   outfile.write(job+"\n")
   return job
 
-def _applyrerank(corpus, idstr, rerankweights, outfile, args):
+def _applyrerank(corpus, adjoin, idstr, rerankweights, decodefile, outfile, args):
   ''' apply rerank model'''
-  cmd="qsubrun -j oe -o {root}/rerank.{corpus}.monitor -N {corpus}.{label}.rerank -W depend=afterok:{idstr} -- {applymodel} -i {corpus} -w {tuneweights} -k {rerankweights} -b {outfile}".format(root=args.root, idstr=idstr, applymodel=os.path.join(args.pipeline, args.rerankapply),  tuneweights=os.path.join(args.input, "weights.final"), rerankweights=rerankweights, outfile=outfile, corpus=corpus, label=args.label)
+  cmd="qsubrun -j oe -o {root}/rerank.{corpus}.monitor -N {corpus}.{label}.rerank -W depend=afterok:{idstr} -- {applymodel} -i {adjoin} -w {tuneweights} -k {rerankweights} -b {decodefile}".format(root=args.root, idstr=idstr, applymodel=os.path.join(args.pipeline, args.rerankapply), adjoin=adjoin, tuneweights=os.path.join(args.input, "weights.final"), rerankweights=rerankweights, decodefile=decodefile, corpus=corpus, label=args.label)
   outfile.write(cmd+"\n")
   job = check_output(shlex.split(cmd)).decode('utf-8').strip()
   JOBS.add(job)
   outfile.write(job+"\n")
   return job
+
+def _package(corpus, idstr, orig, tstmaster, decodefile, outfile, args):
+  ''' make elisa package '''
+  cmd= "qsubrun -N {corpus}.{label}.package -j oe -o {root}/{corpus}.package.monitor -W depend=afterok:{idstr} -- {package} {decodefile} {orig} {tstmaster} {root}/{label}-rescore.{lang}-eng.{corpus}.y1r1.v2.xml.gz".format(root=args.root, package=args.packagecmd, decodefile=decodefile, corpus=corpus, orig=orig, tstmaster=tstmaster,  label=args.label, lang=args.lang, idstr=idstr )
+  outfile.write(cmd+"\n")
+  job = check_output(shlex.split(cmd)).decode('utf-8').strip()
+  JOBS.add(job)
+  outfile.write(job+"\n")
+
 
 def prepfile(fh, code):
   if type(fh) is str:
@@ -121,11 +129,11 @@ def main():
   datasets = set(args.eval)
   datasets.add(args.dev)
 
-  combineids = []
+  combineids = {}
   adjoins = {}
   qsub = ""
   if args.qsubopts is not None:
-    qsub = "--extra_qsub_opts={}".format(args.qsubopts)
+    qsub = "--extra_qsub_opts=\"{}\"".format(args.qsubopts)
   global JOBS
   for dataset in datasets:
     jobids = []
@@ -158,28 +166,19 @@ def main():
     outfile.write(cmd+"\n")
     job = check_output(shlex.split(cmd)).decode('utf-8').strip()
     JOBS.add(job)
-    combineids.append(job)
+    combineids[dataset] = job
 
-  # figure out what feature list is actually going to be (easier to just make it than catch output of combineid)
-  featels = ' '.join(["nmt_{}".format(x) for x in range(len(args.model_nums))])
+  # the rerank model
   rerankweights="{}/rerank.weights".format(args.root)
-  # run actual rerank
-  decodestr = ' '.join([adjoins[x] for x in args.eval])
-  combineidstr = ':'.join(combineids)
-  cmd="qsubrun -q isi -l walltime=0:10:00 -j oe -o {root}/rescore.monitor -N {label}.rescore -W depend=afterok:{combineidstr} -- {rerank} -S {suffix} -f \"{featels}\" -w {weights} -r {devref} -o {root} -t {devadj} {decodestr}".format(root=args.root, combineidstr=combineidstr, suffix=args.suffix, rerank=os.path.join(args.pipeline, args.runrerank), featels=featels, weights=os.path.join(args.input, "weights.final"), devref=os.path.join(args.input, "{}.trg.ref".format(args.dev)), devadj=adjoins[args.dev], decodestr=decodestr, label=args.label)
-  outfile.write(cmd+"\n")
-  job = check_output(shlex.split(cmd)).decode('utf-8').strip()
-  JOBS.add(job)
-  outfile.write(job+"\n")
-  rescoreid="-W depend=afterok:{}".format(job)
+  modeljob = _rerankmodel(adjoins[args.dev], combineids[args.dev], rerankweights, outfile, args)
+
+  # apply and package
   for dataset in datasets:
     orig=os.path.join(args.input, "{}.src.orig".format(dataset))
     tstmaster = os.path.join(args.input, "*.{}.*.xml.gz".format(dataset))
-    cmd= "qsubrun -N {dataset}.{label}.rescore.package -j oe -o {root}/{dataset}.package.monitor {rescoreid} -- {package} {root}/{dataset}.adjoin.{suff}.{suff} {orig} {tstmaster} {root}/{label}-rescore.{lang}-eng.{dataset}.y1r1.v2.xml.gz".format(root=args.root, package=args.packagecmd, suff=args.suffix,  name=args.name, dataset=dataset, orig=orig, tstmaster=tstmaster, child=args.child, label=args.label, lang=args.lang, rescoreid=rescoreid )
-    outfile.write(cmd+"\n")
-    job = check_output(shlex.split(cmd)).decode('utf-8').strip()
-    JOBS.add(job)
-    outfile.write(job+"\n")
+    decodefile = "{}/{}.decode".format(args.root, dataset)
+    applyid = _applyrerank(dataset, adjoins[dataset], ':'.join([modeljob, combineids[dataset]]), rerankweights, decodefile, outfile, args)
+    _package(dataset, applyid, orig, tstmaster, decodefile, outfile, args)
 
   # (TODO: run bleu)
 

@@ -42,9 +42,9 @@ def _child(args, trainid):
     qsub=""
 
   cmd = "{train} --name {name} --mode child --parent_model {par} --trained_model {child} --no-align --previous_alignment {stand}/berk_aligner {qsub} --model_nums {nums} -ts {data}/{tr_src} -tt {data}/{tr_trg} -ds {data}/{dv_src} -dt {data}/{dv_trg} -e {epochs}".format(train=args.traincmd, name=args.name, par=args.parent, child=args.child, stand=args.standalone, qsub=qsub, nums=' '.join(args.model_nums), data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, epochs=args.epochs)
-  sys.stderr.write(cmd+"\n")
   trainid = ""
   if args.do_child_train:
+    sys.stderr.write(cmd+"\n")
     trainid=run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
     trainid = "-W depend=afterok:{}".format(trainid)
 
@@ -57,9 +57,9 @@ def _child(args, trainid):
     tstmaster = os.path.join(args.data, "*.{}.*.xml.gz".format(decset))
     nums = ' '.join(args.model_nums)
     cmd="qsubrun {trainid} -N {name}.{decset}.child.decode -o  {child}/{decset}.monitor -- {decode} -i {input} -m {child} -n {nums} -o {child}/{decset}.decode -l {child}/{decset}.log".format(decode=args.decodecmd, trainid=trainid, name=args.name, decset=decset, child=args.child, input=input, nums=nums)
-    sys.stderr.write(cmd+"\n")
     decodeid = ""
     if args.do_child_decode:
+      sys.stderr.write(cmd+"\n")
       decodeid = run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
       decodeid = "-W depend=afterok:{}".format(decodeid)
 
@@ -67,14 +67,15 @@ def _child(args, trainid):
     # package
     cmd= "qsubrun -N {name}.{decset}.child.package -j oe -o {child}/{decset}.package.monitor {decodeid} -- {package} {child}/{decset}.decode {orig} {tstmaster} {child}/{name}-child.{lang}-eng.{decset}.y1r1.v2.xml.gz".format(package=args.packagecmd,  name=args.name, decset=decset, child=args.child, decodeid=decodeid, orig=orig, tstmaster=tstmaster, lang=args.lang )
     if args.do_child_package:
+      sys.stderr.write(cmd+"\n")
       run(shlex.split(cmd), check=True)
 
 def _standalone(args):
   # train
   cmd = "{train} --name {name} --mode standalone --trained_model {stand} --model_nums {nums} -ts {data}/{tr_src} -tt {data}/{tr_trg} -ds {data}/{dv_src} -dt {data}/{dv_trg} -e {epochs}".format(train=args.traincmd, name=args.name, stand=args.standalone, nums=' '.join(args.model_nums), data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, epochs=args.epochs)
-  sys.stderr.write(cmd+"\n")
   trainid = ""
   if args.do_standalone_train:
+    sys.stderr.write(cmd+"\n")
     trainid_elts=run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
     trainid = "-W depend=afterok:{}".format(trainid_elts)
 
@@ -87,9 +88,9 @@ def _standalone(args):
     tstmaster = os.path.join(args.data, "*.{}.*.xml.gz".format(decset))
     nums = ' '.join(args.model_nums)
     cmd="qsubrun {trainid} -N {name}.{decset}.standalone.decode -o  {stand}/{decset}.monitor -- {decode} -i {input} -m {stand} -n {nums} -o {stand}/{decset}.decode -l {stand}/{decset}.log".format(decode=args.decodecmd, trainid=trainid, name=args.name, decset=decset, stand=args.standalone, input=input, nums=nums)
-    sys.stderr.write(cmd+"\n")
     decodeid = ""
     if args.do_standalone_decode:
+      sys.stderr.write(cmd+"\n")
       decodeid = run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
       decodeid = "-W depend=afterok:{}".format(decodeid)
 
@@ -97,6 +98,7 @@ def _standalone(args):
     # package
     cmd= "qsubrun -N {name}.{decset}.standalone.package -j oe -o {stand}/{decset}.package.monitor {decodeid} -- {package} {stand}/{decset}.decode {orig} {tstmaster} {stand}/{name}-standalone.{lang}-eng.{decset}.y1r1.v2.xml.gz".format(package=args.packagecmd,  name=args.name, decset=decset, stand=args.standalone, decodeid=decodeid, orig=orig, tstmaster=tstmaster, lang=args.lang )
     if args.do_standalone_package:
+      sys.stderr.write(cmd+"\n")
       run(shlex.split(cmd), check=True)
   return trainid_elts
 
@@ -184,8 +186,11 @@ def main():
   # standalone
   elts = []
   if args.do_standalone:
-    elts.append(_standalone(args))
+    saelts = _standalone(args)
+    # child depends on alignment (for decode)
+    elts.append(saelts.split(':')[0])
   if args.do_parent:
+    # child depends on parent
     elts.append(_parent(args))
   if args.do_child:
     _child(args, ':'.join(elts))
