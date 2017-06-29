@@ -76,12 +76,14 @@ def main():
   qsubopts = args.extra_qsub_opts if args.extra_qsub_opts is not None else ""
 
   # split into desired number of pieces
-  splitcmd = run(shlex.split("split -a 1 -n l/{} -d {} {}/data.".format(args.splitsize, args.datafile, workdir)), check=True)
+  fill = len(str(args.splitsize-1))
+  splitcmd = run(shlex.split("split -a {} -n l/{} -d {} {}/data.".format(fill, args.splitsize, args.datafile, workdir)), check=True)
   jobids = []
   outfiles = []
   joincmd = "qsubrun -q isi -l walltime=24:00:00 -j oe -o {logfile} -N {outfile}.join -W depend=afterok:".format(logfile=args.logfile, outfile=args.outfile)
   for piece in range(args.splitsize):
     # split back into source and target
+    piece = str(piece).zfill(fill)
     df = "{}/data.{}".format(workdir, piece)
     of = "{}/scores.{}".format(workdir, piece)
     outfiles.append(of)

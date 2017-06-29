@@ -95,14 +95,14 @@ def getlongest(*files):
   return max
 
 def main():
-  parser = argparse.ArgumentParser(description="run rescoring/force decoding; take advantage of multi gpu",
+  parser = argparse.ArgumentParser(description="run nmt decoding",
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   addonoffarg(parser, 'debug', help="debug mode", default=False)
   parser.add_argument("--input", "-i", type=str, required=True, help="input datafile")
   parser.add_argument("--model", "-m", required=True, help="model file")
   parser.add_argument("--modelnum", "-n", nargs='+', type=int, default=[x for x in range(1,9)], help="model numbers")
   parser.add_argument("--logfile", "-l", type=str, default=None, help="where to log data")
-  parser.add_argument("--outfile", "-o", type=str, required=True, help="output scores file")
+  parser.add_argument("--outfile", "-o", type=str, required=True, help="output translations file")
   parser.add_argument("--extra_rnn_args", help="extra arguments to rnn binary")
   parser.add_argument("--rnn_location", default=os.path.join(scriptdir, 'helper_programs', 'ZOPH_RNN'), help="rnn binary")
 
