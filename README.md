@@ -23,3 +23,6 @@ you shouldn't have to prepare reranking input directories yourself, but here's h
 e.g.  scripts/setup_rerank_input.sh /home/nlg-05/pust/elisa-y2/dryrun-2017-06-05/il3-eng/tl-convert4/penn/usoov rerank/dr_17_06/penn-oov2/il3/input
 
 here's an example of rescore_all: for i in quarter eighth; do scripts/rescore_all.py -i rerank/dr_17_06/penn/il3/input/ -m dr_17_06/il3/child_"$i" -n 1 -L il3 -l rr_"$i" -r dr_17_06/il3/rerank_penn_"$i" -S m_1 -w 10 -e eval; done
+
+
+Zoph RNN code under repo at git@github.com:isi-nlp/Zoph_RNN.git
