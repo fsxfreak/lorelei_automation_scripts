@@ -139,6 +139,7 @@ def main():
     jobids = []
     allscores = []
     # rescore submissions; catch jobids
+    modelroot=os.path.realpath(args.model)
     for model in args.model_nums:
       data = os.path.realpath(os.path.join(args.input, "{}.src.hyp".format(dataset)))
       scores = os.path.realpath(os.path.join(args.root, "{}.m{}.scores".format(dataset, model)))
@@ -147,9 +148,15 @@ def main():
         if not os.path.exists(scores):
           sys.stderr.write("ERROR: Skipping nmt but {} does not exist\n".format(scores))
           sys.exit(1)
+      elif not os.path.exists(data):
+        sys.stderr.write("ERROR: {} does not exist\n".format(data))
+        sys.exit(1)
+      elif not os.path.exists(modelroot): #TODO: also check model number!
+        sys.stderr.write("ERROR: {} does not exist\n".format(modelroot))
+        sys.exit(1)
       else:
         log = os.path.realpath(os.path.join(args.root, "{}.m{}.log".format(dataset, model)))
-        cmd = "{rescore} {qsub} --workdir {root}/{dataset} --splitsize {width} --model {modelroot} --modelnum {model} --datafile {data} --outfile {scores} --logfile {log}".format(qsub=qsub, model=model, rescore=args.rescore_single, modelroot=os.path.realpath(args.model), data=data, root=args.root, dataset=dataset, scores=scores, width=args.width, log=log)
+        cmd = "{rescore} {qsub} --workdir {root}/{dataset} --splitsize {width} --model {modelroot} --modelnum {model} --datafile {data} --outfile {scores} --logfile {log}".format(qsub=qsub, model=model, rescore=args.rescore_single, modelroot=modelroot, data=data, root=args.root, dataset=dataset, scores=scores, width=args.width, log=log)
         outfile.write(cmd+"\n")
         job = check_output(shlex.split(cmd)).decode('utf-8').strip()
         JOBS.add(job)
