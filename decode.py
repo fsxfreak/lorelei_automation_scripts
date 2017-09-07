@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # code by Jon May [jonmay@isi.edu]
 #PBS -q isi
-#PBS -l walltime=96:00:00
+#PBS -l walltime=24:00:00
 #PBS -l gpus=2
 #PBS -j oe
 
@@ -70,8 +70,15 @@ def get_model_config(args):
   gpus = cycle(range(getgpucount()))
   for model in MODELSEQ:
     if model in args.modelnum:
-      mflags+=" {}".format(next(gpus))
-      modseq+=" {}".format(os.path.join(args.model, "model{}".format(model), "best.nn"))
+      # support ensemble of models
+      gpu_allocations = [ '%s' % next(gpus) for _ in args.model ]
+      mflags += ' '.join(gpu_allocations)
+      #mflags+=" {}".format(next(gpus))
+
+      best_nns = [ os.path.join(e, 'model%s' % model, 'best.nn') 
+                   for e in args.model ]
+      modseq += ' '.join(best_nns)
+      #modseq+=" {}".format(os.path.join(args.model, "model{}".format(model), "best.nn"))
   return (mflags, modseq)
       
 def prepare_data(args, workdir):
@@ -80,7 +87,10 @@ def prepare_data(args, workdir):
   for model in args.modelnum:
     fname=os.path.join(workdir, "src.{}.txt".format(model))
     shutil.copy(args.input, fname)
-    fseq+= " {}".format(fname)
+    
+    # copy input file multiple times for the ensemble of models
+    fseqs = [ '%s' % fname for _ in args.model ]
+    fseq += ' %s' % ' '.join(fseqs)
   return(fseq)
   
 
@@ -99,7 +109,7 @@ def main():
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   addonoffarg(parser, 'debug', help="debug mode", default=False)
   parser.add_argument("--input", "-i", type=str, required=True, help="input datafile")
-  parser.add_argument("--model", "-m", required=True, help="model file")
+  parser.add_argument("--model", "-m", nargs='+', required=True, help="model file")
   parser.add_argument("--modelnum", "-n", nargs='+', type=int, default=[x for x in range(1,9)], help="model numbers")
   parser.add_argument("--logfile", "-l", type=str, default=None, help="where to log data")
   parser.add_argument("--outfile", "-o", type=str, required=True, help="output translations file")
@@ -120,7 +130,7 @@ def main():
     parser.error(str(msg))
 
 
-  ttable = os.path.join(args.model, args.ttable)
+  ttable = os.path.join(args.model[0], args.ttable)
   workdir = tempfile.mkdtemp(prefix=os.path.basename(__file__), dir=os.getenv('TMPDIR', '/tmp'))
   def cleanwork():
     shutil.rmtree(workdir, ignore_errors=True)

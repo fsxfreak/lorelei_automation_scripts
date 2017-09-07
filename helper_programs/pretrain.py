@@ -73,7 +73,10 @@ def replacevocab(parent, prechild, expected_size, textfile, skips):
     if re.match("^=+$", line) is not None:
       prechild.write(line)
       break
-    i, _ = line.strip().split()
+    try:
+      i, _ = line.strip().split()
+    except ValueError:
+      print(line)
     prechild.write("%s %s\n" % (i, vocab[int(i)-1]))
 
       

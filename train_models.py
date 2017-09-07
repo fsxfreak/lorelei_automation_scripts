@@ -58,12 +58,37 @@ def runchildmodel(args, modelnum):
 
 def runmodel(args, modelnum, countfile, opts):
   ''' launch standalone/parent model (replaces train_single_model.sh) '''
-  root = args.trained_model
-  modelroot=os.path.join(root, "model{}".format(modelnum))
-  cmd="qsubrun -N {name}.{mode}.{modelnum}.train -j oe -o {modelroot}/train.monitor {qsubopts} -- {rnnwrap} {rnnbin} -t {trainsource} {traintarget} {modelroot}/model.nn -a {devsource} {devtarget} {opts} --vocab-mapping-file {countfile} --logfile {modelroot}/train.log".format(rnnwrap=args.rnnwrap, name=args.name, modelnum=modelnum, mode=args.mode, modelroot=modelroot, qsubopts=args.qsubopts, trainsource=args.train_source, traintarget=args.train_target, devsource=args.dev_source, devtarget=args.dev_target, opts=opts, countfile=countfile, rnnbin=args.rnn_binary)
-  sys.stderr.write(cmd+"\n")
-  jobid = run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
-  return jobid
+
+  # start this many candidate models
+  NUM_STARTS = 4
+  starts = []
+  if args.trained_model.endswith('/'):
+    args.trained_model = args.trained_model[:-1]
+  jobids = []
+  for start in range(NUM_STARTS):
+    root = '%s-%d' % (args.trained_model, start)
+    modelroot=os.path.join(root, "model{}".format(modelnum))
+    mkdir_p(modelroot)
+    cmd=("qsubrun -N {name}.{mode}.{modelnum}.train"
+        " -j oe -o {modelroot}/train.monitor {qsubopts}"
+        " -- {rnnwrap} {rnnbin}"
+        " -t {trainsource} {traintarget} {modelroot}/model.nn"
+        " -B {modelroot}/best.nn"
+        " -a {devsource} {devtarget} {opts}"
+        " --vocab-mapping-file {countfile}"
+        " --logfile {modelroot}/train.log").format(
+            name=args.name, modelnum=modelnum, mode=args.mode,
+            modelroot=modelroot, qsubopts=args.qsubopts, 
+            rnnwrap=args.rnnwrap, rnnbin=args.rnn_binary,
+            trainsource=args.train_source, traintarget=args.train_target, 
+            devsource=args.dev_source, devtarget=args.dev_target, opts=opts, 
+            countfile=countfile)
+    sys.stderr.write(cmd+"\n")
+    jobid = run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
+    jobids.append(jobid)
+    starts.append('%s|||%s' % (jobid, os.path.join(modelroot, 'train.log')))
+
+  return ':'.join(jobids), starts
 
 def prepfile(fh, code):
   if type(fh) is str:
@@ -101,6 +126,7 @@ def main():
   parser.add_argument("--train_target", "-tt", required=True, help="target side of training data")
   parser.add_argument("--mapping_source", "-ms",  help="source side of child data when building parent (for mapping)")
   parser.add_argument("--mapping_target", "-mt",  help="target side of child data when building parent (for mapping)")
+  parser.add_argument("--vocab_force", "-vf",  default=None, help="force target vocabulary when building parent")
 
   parser.add_argument("--dev_source", "-ds", required=True, help="source side of dev data")
   parser.add_argument("--dev_target", "-dt", required=True, help="target side of dev data")
@@ -115,6 +141,7 @@ def main():
   parser.add_argument("--alignconf",default=os.path.join(scriptdir, 'helper_programs', 'unk_replace.conf'), help="aligner data")
   parser.add_argument("--mappingstandalone",default=os.path.join(scriptdir, 'helper_programs', 'create_mapping_pureNMT.py'), help="mapping program")
   parser.add_argument("--mappingparent",default=os.path.join(scriptdir, 'helper_programs', 'create_mapping_parent.py'), help="mapping program")
+  parser.add_argument("--mappingparentagn",default=os.path.join(scriptdir, 'helper_programs', 'create_mapping_parent_agnostic.py'), help="mapping program")
   parser.add_argument("--berkalignsh", default=os.path.join(scriptdir, 'helper_programs', 'berk_align.sh'), help="aligner cmd")
   parser.add_argument("--rnnwrap", default=os.path.join(scriptdir, 'helper_programs', 'rnn_wrap.sh'), help="rnn wrapper")
   parser.add_argument("--pretrain", default=os.path.join(scriptdir, 'helper_programs', 'pretrain.py'), help="pretrain child model trainer")
@@ -176,8 +203,10 @@ def main():
   else:
     if args.mode == 'standalone':
       cmd = "{mapping} {trainsource} {traintarget} 6 {modelroot}/count6.nn".format(mapping=args.mappingstandalone, trainsource=args.train_source, traintarget=args.train_target, modelroot=args.trained_model)
-    elif args.mode == 'parent':
+    elif args.mode == 'parent' and not args.vocab_force:
       cmd = "{mapping} {mapsource} {maptarget} 6 {modelroot}/count6.nn {trainsource}".format(mapping=args.mappingparent, mapsource=args.mapping_source, maptarget=args.mapping_target, trainsource=args.train_source, modelroot=args.trained_model)
+    elif args.mode == 'parent' and args.vocab_force:
+      cmd = "{mapping} {mapsource} {maptarget} 6 {modelroot}/count6.nn {trainsource}".format(mapping=args.mappingparentagn, mapsource=args.mapping_source, maptarget=args.vocab_force, trainsource=args.train_source, modelroot=args.trained_model)
     sys.stderr.write(cmd+"\n")
     run(shlex.split(cmd), check=True)
 
@@ -189,11 +218,22 @@ def main():
       jobids.append(runchildmodel(args, modelnum))
     else:
       countfile = "{}/count6.nn".format(args.trained_model)
-      opts=modelopts[modelnum]+" -B {}/best.nn".format(modelpath)
-      jobids.append(runmodel(args, modelnum, countfile, opts))
-  
+      #opts=modelopts[modelnum]+" -B {}/best.nn".format(modelpath)
+      opts=modelopts[modelnum]
+      jobids_out, starts = runmodel(args, modelnum, countfile, opts)
+      jobids.append(jobids_out)
+
+      watch_cmd = ['qsubrun', '-j', 'oe', '-o', '/home/nlg-05/ljcheung/logs', 
+          '--', os.path.join(scriptdir, 'watch_training.py'), 
+          '--watches', ':'.join(starts),
+          '--final_model_dir', args.trained_model]
+      watchid = run(watch_cmd, 
+          check=True, stdout=PIPE).stdout.decode('utf-8').strip()
+      jobids.append(watchid)
+      sys.stderr.write('%s\n' % ' '.join(watch_cmd))
+ 
   outfile = prepfile(args.outfile, 'w')
-  outfile.write(':'.join(jobids)+"\n")
+  outfile.write('%s\n' % ':'.join(jobids))
 
 if __name__ == '__main__':
   main()

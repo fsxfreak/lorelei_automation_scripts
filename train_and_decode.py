@@ -48,7 +48,6 @@ def _child(args, trainid):
     trainid=run(shlex.split(cmd), check=True, stdout=PIPE).stdout.decode('utf-8').strip()
     trainid = "-W depend=afterok:{}".format(trainid)
 
-
   for decset in args.decodes:
 
     # decode
@@ -72,6 +71,7 @@ def _child(args, trainid):
 
 def _standalone(args):
   # train
+  trainid_elts=''
   cmd = "{train} --name {name} --mode standalone --trained_model {stand} --model_nums {nums} -ts {data}/{tr_src} -tt {data}/{tr_trg} -ds {data}/{dv_src} -dt {data}/{dv_trg} -e {epochs}".format(train=args.traincmd, name=args.name, stand=args.standalone, nums=' '.join(args.model_nums), data=args.data, tr_src=args.train_source, tr_trg=args.train_target, dv_src=args.dev_source, dv_trg=args.dev_target, epochs=args.epochs)
   trainid = ""
   if args.do_standalone_train:
@@ -142,6 +142,7 @@ def main():
   parser.add_argument("--train_target", default="train.trg",  help="target side of (stand/child) training data")
   parser.add_argument("--parent_source", default="train.src",  help="source side of parent data")
   parser.add_argument("--parent_target", default="train.trg",  help="target side of parent data")
+  parser.add_argument("--vocab_force", default=None,  help="force target vocabulary when building parent, word\\tfreq")
 
   parser.add_argument("--dev_source", default="dev.src", help="source side of (stand/child) dev data")
   parser.add_argument("--dev_target", default="dev.trg", help="target side of (stand/child) dev data")

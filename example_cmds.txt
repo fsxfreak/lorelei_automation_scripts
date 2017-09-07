@@ -1,0 +1,442 @@
+train parent and child model with standalone nmt
+./train_and_decode.py --name base --lang il3 --standalone ../../output/lorelei/standalone_auto_quick --parent ../../output/lorelei/parent_eighth --child ../../output/lorelei/child_eighth --epochs 20 -P 1 -N 1 --data /home/nlg-05/ljcheung/data/il3u/ --parent_data /home/nlg-05/jonmay/cnmt/bz/parent/fra/data/ --parent_source train.src.eighth.tc --parent_target train.trg.eighth.tc --parent_dev_source dev.src.tc --parent_dev_target dev.trg.tc --no-do_parent --no-do_child_train --no-do_standalone --decodes test syscomb dev unseq
+
+rescoring using the parent child model
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input -m ../../output/lorelei/child_eighth -n 1 -L il3 -l rr_eighth -r ../../output/lorelei/rerankout -S m_1 -w 3 -e unseq --qsubopts="-W depend=afterok:23629890"
+dependafterok after teh child model finishes training
+
+
+rescoring manual runs
+./rescore_all.py -i /home/nlg-05/jonmay/cnmt/bz/rerank/dr_17_06/penn/il3/input/ -m ../../output/child_eighth -n 1 -L il3 -l rr_eighth -r ../../output/lorelei/rerankout2 -S m_1 -w 3 -e dev --skipnmt
+
+rescoring using the dl4mt (most recent model)
+./rescore_all_dl.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input --rescore_single_dl "../../jobs/dl-frc-bi-il3-res.sh" --model_dir /home/nlg-05/ljcheung/models/dl4mt-il3-ug --dict_src /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.ug.train.404.pkl --dict_trg /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.en.train.404.pkl -L il3 -l rr_dl_usq -r ../../output/dl-rr-out -S m_1 -w 3 -e unseq
+
+mydata at dl4mt 48hr
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input --rescore_single_dl "../../jobs/dl-frc-bi-il3-res.sh" --model_dir /home/nlg-05/ljcheung/models/dl4mt-il3-ug --model_grads bi-char2char.grads.440000.npz --dict_src /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.ug.train.404.pkl --dict_trg /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.en.train.404.pkl -L il3 -l rr-dl-48 -r ../../output/dl-rr-out-48 -S m_1 -w 3 -e unseq
+
+rescoring dl4mt penn-oov
+./rescore_all_dl.py -i /home/nlg-05/jonmay/cnmt/bz/rerank/dr_17_06/penn-oov/il3/input/ --rescore_single_dl "../../jobs/dl-frc-bi-il3-res.sh" --model_dir /home/nlg-05/ljcheung/models/dl4mt-il3-ug --dict_src /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.ug.train.404.pkl --dict_trg /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.en.train.404.pkl -L il3 -l rr_dl-oov -r ../../output/dl-rr-out-oov -S m_1 -w 3 -e dev syscomb test
+
+rescoring ensemble zoph and dl4mt most recent
+./rescore_all.py \
+  -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+  --rescore_single_dl "../../jobs/dl-frc-bi-il3-res.sh" \
+  --model_dir /home/nlg-05/ljcheung/models/dl4mt-il3-ug \
+  --dict_src /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.ug.train.404.pkl \
+  --dict_trg /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.en.train.404.pkl \
+  -m ../../output/lorelei/child_eighth \
+  -n 1 \
+  -L il3 \
+  -l rr_ebl_zp_dl \
+  -r ../../output/zp-dl-out \
+  -S m_1 \
+  -w 3 \
+  -e dev syscomb test unseq
+
+training with forced disaster vocab
+./train_and_decode.py --name agn-dis-8th-30k-int --lang il3 \
+    --standalone ../../output/lorelei/standalone_auto_quick \
+    --parent ../../output/agn-dis-pr-8th-30k-int \
+    --child ../../output/agn-dis-ch-8th-30k-int \
+    --epochs 20 -P 1 -N 1 \
+    --data /home/nlg-05/jonmay/cnmt/bz/dr_17_06/il3/data/ \
+    --parent_data /home/nlg-05/jonmay/cnmt/bz/parent/fra/data/ \
+    --parent_source train.src.eighth.tc --parent_target train.trg.eighth.tc \
+    --parent_dev_source dev.src.tc \
+    --parent_dev_target dev.trg.tc \
+    --decodes test syscomb dev \
+    --vocab_force /home/nlg-05/ljcheung/data/disaster/dis.en.vocab \
+    --no-do_standalone
+rescoring forced disaster vocab
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+    -m ../../output/agn-dis-ch-8th-30k-int \
+    -n 1 -L il3 -l rr-agn-dis-8th-30k-int \
+    -r ../../output/rr-agn-dis-8th-30k-int \
+    -S m_1 -w 3 -e test syscomb dev unseq --qsubopts="-W depend=afterok:23764496"
+
+training with forced parent trg vocab
+./train_and_decode.py --name agn-par-8th-30k-int --lang il3 \
+    --standalone ../../output/lorelei/standalone_auto_quick \
+    --parent ../../output/agn-par-pr-8th-30k-int \
+    --child ../../output/agn-par-ch-8th-30k-int \
+    --epochs 20 -P 1 -N 1 \
+    --data /home/nlg-05/jonmay/cnmt/bz/dr_17_06/il3/data/ \
+    --parent_data /home/nlg-05/jonmay/cnmt/bz/parent/fra/data/ \
+    --parent_source train.src.eighth.tc --parent_target train.trg.eighth.tc \
+    --parent_dev_source dev.src.tc \
+    --parent_dev_target dev.trg.tc \
+    --decodes test syscomb dev \
+    --vocab_force /home/nlg-05/ljcheung/data/fr-pr-vocab/par.en.vocab \
+    --no-do_standalone
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+    -m ../../output/agn-par-ch-8th-30k-int \
+    -n 1 -L il3 -l rr-agn-par-8th-30k-int \
+    -r ../../output/rr-agn-par-8th-30k-int \
+    -S m_1 -w 3 -e test syscomb dev unseq --qsubopts="-W depend=afterok:23764496"
+
+training with forced disaster 40kvocab
+./train_and_decode.py --name agn-dis-8th-40k-int --lang il3 \
+    --standalone ../../output/lorelei/standalone_auto_quick \
+    --parent ../../output/agn-dis-pr-8th-40k-int \
+    --child ../../output/agn-dis-ch-8th-40k-int \
+    --epochs 20 -P 1 -N 1 \
+    --data /home/nlg-05/jonmay/cnmt/bz/dr_17_06/il3/data/ \
+    --parent_data /home/nlg-05/jonmay/cnmt/bz/parent/fra/data/ \
+    --parent_source train.src.eighth.tc --parent_target train.trg.eighth.tc \
+    --parent_dev_source dev.src.tc \
+    --parent_dev_target dev.trg.tc \
+    --decodes test syscomb dev \
+    --vocab_force /home/nlg-05/ljcheung/data/disaster/dis.en.vocab \
+    --no-do_standalone
+rescoring forced disaster vocab
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+    -m ../../output/agn-dis-ch-8th-40k-int \
+    -n 1 -L il3 -l rr-agn-dis-8th-40k-int \
+    -r ../../output/rr-agn-dis-8th-40k-int \
+    -S m_1 -w 3 -e test syscomb dev unseq --qsubopts="-W depend=afterok:23764496"
+
+rescoring zoph disaster and dl4mt
+./rescore_all.py \
+  -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+  --rescore_single_dl "../../jobs/dl-frc-bi-il3-res.sh" \
+  --model_dir /home/nlg-05/ljcheung/models/dl4mt-il3-ug \
+  --dict_src /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.ug.train.404.pkl \
+  --dict_trg /home/nlg-05/ljcheung/data/il3-ug/il3-ug.ug-en.en.train.404.pkl \
+  -m ../../output/agn-dis-ch-8th-40k-int \
+  -n 1 \
+  -L il3 \
+  -l rr_zpdis_dl \
+  -r ../../output/rr-zpdis-dl-test \
+  -S m_1 \
+  -w 3 \
+  -e dev syscomb test unseq
+
+rescoring tf
+./rescore_all.py \
+  -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+  --tf-script "../../jobs/tf-frc-ug.pbs" \
+  -L il3 \
+  -l rr-zp-tf-test \
+  -r ../../output/rr-zp-tf-test \
+  -S m_1 \
+  -w 2 \
+  -e dev syscomb test unseq
+
+rescoring dl child model
+./rescore_all.py \
+    -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+    --rescore_single_dl "../../jobs/dl-frc-bi-il3-res.sh" \
+    --model_grads "bi-char2char.grads.330000.npz" \
+    --model_dir /home/nlg-05/ljcheung/models/dl-ug-ch \
+    --dict_src /home/nlg-05/ljcheung/data/il3-ug-fr/il3-ug.ug-en.ug.train.par.pkl \
+    --dict_trg /home/nlg-05/ljcheung/data/il3-ug-fr/il3-ug.ug-en.en.train.404.pkl \
+    --n_words_src 1274 \
+    --n_words 1315 \
+    -L il3 \
+    -l rr_dlch \
+    -r ../../output/rr-dlch \
+    -S m_1 -w 3 -e dev syscomb test unseq
+
+training with forced disaster 40kvocab, big french
+./train_and_decode.py --name a-d-full-40k-i --lang il3 \
+    --standalone ../../output/lorelei/standalone_auto_quick \
+    --parent ../../output/agn-dis-pr-full-40k-int \
+    --child ../../output/agn-dis-ch-full-40k-int \
+    --epochs 20 -P 1 -N 1 \
+    --data /home/nlg-05/ljcheung/data/il3u \
+    --parent_data /home/nlg-05/jonmay/cnmt/bz/parent/fra/data/ \
+    --parent_source train.src.tc --parent_target train.trg.tc \
+    --parent_dev_source dev.src.tc \
+    --parent_dev_target dev.trg.tc \
+    --decodes test syscomb dev unseq \
+    --vocab_force /home/nlg-05/ljcheung/data/disaster/dis.en.vocab \
+    --no-do_standalone
+rescoring forced disaster vocab
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+    -m ../../output/agn-dis-ch-full-40k-int \
+    -n 1 -L il3 -l rr-a-d-full-40k-i \
+    -r ../../output/rr-agn-dis-full-40k-int \
+    -S m_1 -w 3 -e test syscomb dev unseq --qsubopts="-W depend=afterok:[num]"
+
+train standalone backwards model
+./train_and_decode.py \
+    --name sa-e-u --lang il3 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/standalone-en-ug-real \
+    --no-do_parent --no-do_child --no-do_standalone_package \
+    -N 1 --data /home/nlg-05/ljcheung/data/il3ub --decodes test syscomb dev unseq
+
+decode some eng data
+./train_and_decode.py \
+    --name sa-e-u-d-d --lang il3 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/standalone-en-ug-real \
+    --no-do_parent --no-do_child --no-do_standalone_train --no-do_standalone_package \
+    -N 1 --data /home/nlg-05/ljcheung/data/il3ub --decodes dis-double.aa  dis-double.ac  dis-double.ae  dis-double.ag  dis-double.ai  dis-double.ak dis-double.ab  dis-double.ad  dis-double.af  dis-double.ah  dis-double.aj  dis-double.al
+
+augment half
+./train_and_decode.py \
+    --name sa-u-e-a --lang il3 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/stnaln-ug-en-aug \
+    --no-do_parent --no-do_child --no-do_standalone_train --no-do_standalone_decode \
+    --epochs 20
+    -N 1 --data /home/nlg-05/ljcheung/data/il3ua --decodes test syscomb dev unseq
+
+augment unity
+./train_and_decode.py \
+    --name sa-u-e-a-unity --lang il3 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/stnaln-ug-en-aug-unity \
+    --no-do_parent --no-do_child --no-do_standalone_train \
+    --epochs 20 -N 1 \
+    --data /home/nlg-05/ljcheung/data/il3ua-unity --decodes test syscomb dev unseq
+
+./rescore_all.py -i /auto/rcf-40/jonmay/projects/cnmt/bz/rehearse/penn/il3/input \
+    -m ../../output/stnaln-ug-en-aug \
+    -n 1 -L il3 -l rr-ue-a-h \
+    -r ../../output/rr-ue-a-h \
+    -S m_1 -w 2 -e test unseq 
+
+augment w2v, no parent 
+./train_and_decode.py \
+    --name ue-a-w2v --lang il3 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/stnaln-ug-en-aug-w2v \
+    --no-do_parent --no-do_child \
+    --data /home/nlg-05/ljcheung/data/il3ua-w2v \
+    --decodes test syscomb dev unseq
+
+./train_and_decode.py \
+    --name base --lang il3 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/jon-standalone/ \
+    --no-do_parent --no-do_child --no-do_standalone_train \
+    --data /home/nlg-05/ljcheung/data/il3u \
+    --decodes dev syscomb test
+
+./train_and_decode.py \
+    --name ue-a-w2v-srco-1k --lang il3 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/isi3-stnaln-ug-en-aug-w2v \
+    --no-do_parent --no-do_child --no-do_standalone_train \
+    --data /home/nlg-05/ljcheung/data/il3u \
+    --decodes test syscomb dev unseq
+    
+./train_and_decode.py \
+    --name b1-dec --lang il3 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/sa-b1 \
+    --no-do_parent --no-do_child  --no-do_standalone_train \
+    --data /home/nlg-05/ljcheung/data/il3u \
+    --decodes test syscomb dev unseq
+
+parent only backtranslated data
+./train_and_decode.py \
+    --name ue-curr --lang il3 \
+    --standalone ../../output/stnaln-ug-en \
+    --parent ../../output/curr-ue-pr \
+    --child ../../output/curr-ue-ch \
+    --epochs 20 -P 1 -N 1 \
+    --data /home/nlg-05/ljcheung/data/il3u/ \
+    --parent_data /home/nlg-05/ljcheung/data/il3ua-parent \
+    --parent_source train.src --parent_target train.trg \
+    --parent_dev_source dev.src --parent_dev_target dev.trg \
+    --no-do_parent \
+    --no-do_standalone \
+    --decodes test syscomb dev unseq
+
+rescoring tf il5 v3 + zoph
+./rescore_all.py \
+  -i /home/nlg-05/ljcheung/data/il5-v3-hyp \
+  --tf-script "../../jobs/tf-frc-ti.pbs" \
+  -L il5 \
+  -m /home/rcf-40/jonmay/projects/cnmt/bz/evals/y2/il5/v4/sa \
+  -n 1 \
+  -l rr-tf-zp-il5-v3 \
+  -r ../../output/rr-tf-zp-il5-v3 \
+  -S m_1 \
+  -w 2 \
+  -e dev test 
+
+rescoring tf il6 v4 + zoph child
+./rescore_all.py \
+  -i /home/nlg-05/ljcheung/data/il6-v4-hyp \
+  --tf-script "../../jobs/tf-frc-om.pbs" \
+  -L il6 \
+  -m /home/rcf-40/jonmay/projects/cnmt/bz/evals/y2/il6/v4/chi \
+  -n 1 \
+  -l rr-tf-zp-il6-v4 \
+  -r ../../output/rr-tf-zp-il6-v4 \
+  -S m_1 \
+  -w 2 \
+  -e dev test 
+
+8 models, varying perlexities
+./train_and_decode.py \
+    --standalone ../../output/de-sa-1 \
+    --name de-sa-1 --lang il3 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --no-do_parent --no-do_child  --no-do_standalone_train --no-do_standalone_package \
+    --data /home/nlg-05/ljcheung/data/ep-de-en \
+    --decodes test
+
+rescore dl4mt zoph tf tigrinya
+./rescore_all.py \
+    -i /home/nlg-05/ljcheung/data/il5-v3-hyp \
+    --rescore_single_dl "../../jobs/dl-frc-bi.sh" \
+    --model_dir /home/nlg-05/ljcheung/models/dl-ti-en-v4 \
+    --dict_src /home/nlg-05/ljcheung/data/il5-v4-tf/train.src.404.pkl \
+    --dict_trg /home/nlg-05/ljcheung/data/il5-v4-tf/train.trg.404.pkl \
+    --n_words_src 433 \
+    --n_words 131 \
+    -n 1 \
+    -L il5 -l rr-dl-zp-tf-il5-v4 \
+    --tf-script "../../jobs/tf-frc-ti.pbs" \
+    --skipnmt \
+    -m /home/rcf-40/jonmay/projects/cnmt/bz/evals/y2/il5/v4/chi \
+    -r ../../output/rr-dl-zp-tf-il5-v4 \
+    -S m_1 -w 4 -e dev test
+
+augment w2v 5k, no parent 
+./train_and_decode.py \
+    --name ue-a-w2v-5k --lang il3 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/test \
+    --no-do_parent --no-do_child --no-do_standalone_decode --no-do_standalone_package \
+    --data /home/nlg-05/ljcheung/data/il3ua-w2v-5k \
+    --decodes test syscomb dev unseq
+
+rescore dl4mt zoph tf oromo
+./rescore_all.py \
+    -i /home/nlg-05/ljcheung/data/il6-v4-hyp \
+    --rescore_single_dl "../../jobs/dl-frc-bi.sh" \
+    --model_dir /home/nlg-05/ljcheung/models/dl-om-en-v4 \
+    --dict_src /home/nlg-05/ljcheung/data/il6-v4-tf/train.src.404.pkl \
+    --dict_trg /home/nlg-05/ljcheung/data/il6-v4-tf/train.trg.404.pkl \
+    --n_words_src 86 \
+    --n_words 93 \
+    --tf-script "../../jobs/tf-frc-ti.pbs" \
+    -m /home/rcf-40/jonmay/projects/cnmt/bz/evals/y2/il6/v4/chi \
+    -n 1 \
+    -L il6 -l rr-dl-zp-tf-il6-v4 \
+    -r ../../output/rr-dl-zp-tf-il6-v4 \
+    --skipnmt \
+    -S m_1 -w 4 -e dev test
+
+testing running multiple standalone models
+./train_and_decode.py \
+    --name mult-tien --lang il5 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/mult-tien-0-0 \
+    --no-do_parent --no-do_child --no-do_standalone_train \
+    --data /home/nlg-05/ljcheung/data/il5-v4 \
+    --decodes dev test 
+./train_and_decode.py \
+    --name mult-test --lang il3 \
+    --epochs 15 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/test \
+    --no-do_parent --no-do_child --no-do_standalone_train  \
+    --data /home/nlg-05/ljcheung/data/il3u \
+    --decodes dev syscomb test unseq
+
+ensemble decode ep-de-en
+qsubrun -N ebl-bot4.decode -o ../../output/de-sa-0/test-ebl-bot4.monitor -- \
+    decode.py \
+        -i ../../data/ep-de-en/test.src \
+        -m ../../output/de-sa-3/ \
+           ../../output/de-sa-1/ ../../output/de-sa-2/ \
+           ../../output/de-sa-7/ \
+        -n 1 \
+        -o ../../output/de-sa-0/test-ebl-bot4.decode \
+        -l ../../output/de-sa-0/test-ebl-bot4.log
+
+qsubrun -N syscomb-ebl-term-4.decode -o ../../output/test/syscomb-ebl-term-4.monitor -- \
+    decode.py \
+        -i ../../data/il3/syscomb.src \
+        -m ../../output/test-0/ ../../output/test-1/ ../../output/test-2/ ../../output/test-3/ \
+        -n 1 \
+        -o ../../output/test-0/syscomb-ebl-term-4.decode \
+        -l ../../output/test-0/syscomb-ebl-term-4.log
+
+multiple backwards models for omoro
+./train_and_decode.py \
+    --name mult-om --lang il5 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/mult-om-0 \
+    --no-do_parent --no-do_child --no-do_standalone_train --no-do_standalone_package \
+    --data /home/nlg-05/ljcheung/data/il6-v5-b \
+    --decodes dev test
+
+ensemble decode oromo
+qsubrun -N test-ebl-term-4.decode -o ../../output/mult-om/test-ebl-term-4.monitor -- \
+    decode.py \
+        -i ../../data/il6-v5-b/test.src \
+        -m ../../output/mult-om-0/ ../../output/mult-om-1/ ../../output/mult-om-2/ ../../output/mult-om-3/ \
+        -n 1 \
+        -o ../../output/mult-om/test-ebl-term-4.decode \
+        -l ../../output/mult-om/test-ebl-term-4.log
+
+multiple forwards models with oromo, with all the backtranslation
+./train_and_decode.py \
+    --name mult-om-all --lang il6 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/mult-om-all-0 \
+    --no-do_parent --no-do_child --no-do_standalone_train --no-do_standalone_package \
+    --data /home/nlg-05/ljcheung/data/il6-all \
+    --decodes domain 
+
+qsubrun -N mult-om-all-ebl.decode -o ../../output/mult-om-all/mult-om-all-ebl.monitor -- \
+    decode.py \
+        -i ../../data/il6-all/test.src \
+        -m ../../output/mult-om-all-0/  ../../output/mult-om-all-1/ ../../output/mult-om-all-2/ ../../output/mult-om-all-3/ ../../output/mult-om-all-4/ ../../output/mult-om-all-5/ \
+        -n 1 \
+        -o ../../output/mult-om-all/test-ebl.decode \
+        -l ../../output/mult-om-all/test-ebl.log
+
+./train_and_decode.py \
+    --name mult-base-om --lang il6 \
+    --epochs 20 -P 1 -N 1 \
+    -p null -c null --parent_data null \
+    --standalone ../../output/mult-base-om-0 \
+    --no-do_parent --no-do_child --no-do_standalone_train \
+    --data /home/nlg-05/ljcheung/data/il6-v5 \
+    --decodes dev test
+    
+rescore oromo with mult
+./rescore_all.py \
+    -i /home/rcf-40/jonmay/projects/cnmt/bz/evals/y2/il6/v5/tgdict4/input \
+    -m /home/nlg-05/ljcheung/output/mult-om-all/ \
+    -n 1 \
+    -L il6 -l rr-zp-mult-il6-v5 \
+    -r ../../output/rr-zp-mult-il6-v5 \
+    -S m_1 -w 4 -e dev test
+
+child model with ormoo with all the extra data
+./train_and_decode.py \
+    --name mult-om-all --lang il6 \
+    --epochs 20 -P 1 -N 1 \
+    -p /home/nlg-05/ljcheung/output/par-om-all \
+    -c /home/nlg-05/ljcheung/output/ch-om-all \
+    -s /home/nlg-05/ljcheung/output/mult-om-all \
+    --no-do_parent \
+    --no-do_standalone \
+    --data /home/nlg-05/ljcheung/data/il6-all \
+    --parent_data /home/rcf-40/jonmay/projects/cnmt/bz/parent/fra/data \
+    --parent_source train.src.32.tc \
+    --parent_target train.trg.32.tc \
+    --parent_dev_source dev.src.tc \
+    --parent_dev_target dev.trg.tc \
+    --decodes dev test
+

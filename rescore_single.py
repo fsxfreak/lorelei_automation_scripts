@@ -125,7 +125,6 @@ def go(args):
     env = os.environ.copy()
     env['CUDA_VISIBLE_DEVICES']="{}".format(gpu)
     output = "{}/output".format(subworkdir)
-    #print(output)
     if args.logfile is not None:
       logfile = "--logfile {}.{}".format(args.logfile, gpu)
     else:
